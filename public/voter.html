@@ -3,19 +3,23 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-<title>Enteronorma — Votar</title>
+<title>NORMA MUNDIAL 2026 — Votar</title>
 <script src="/socket.io/socket.io.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Lexend:wght@400;600;700;900&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --teal:    #4ECBCA;
-    --magenta: #E0179D;
-    --navy:    #1A3A5C;
-    --mex:     #006847;
-    --dark:    #080f1a;
+    --navy:    #0B1E35;
+    --navy2:   #1F3864;
+    --gold:    #F5C518;
+    --green:   #006847;
+    --green-l: #00a86b;
+    --dark:    #060d18;
+    --red:     #e01010;
+    --white:   #ffffff;
+    --gray:    rgba(255,255,255,0.5);
   }
 
   body {
@@ -25,36 +29,67 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    padding: 0;
     overscroll-behavior: none;
   }
 
-  /* ── HEADER ── */
+  /* ── HEADER — broadcast bar ── */
   .header {
     width: 100%;
-    background: linear-gradient(135deg, #0a1a2e, #0d2240);
-    border-bottom: 2px solid var(--teal);
-    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, #0a1628, var(--navy2));
+    border-bottom: 3px solid var(--gold);
+    padding: 0.9rem 1.2rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
   .header-logo {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--teal);
-    line-height: 1.2;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    line-height: 1.1;
   }
-  .header-logo span { color: white; font-weight: 300; display: block; font-size: 0.75rem; }
+  .header-logo span {
+    color: var(--white);
+    font-weight: 400;
+    font-size: 0.7rem;
+    display: block;
+    letter-spacing: 0.08em;
+    font-family: 'Lexend', sans-serif;
+  }
+  .header-right {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .live-badge {
+    background: var(--red);
+    color: #fff;
+    font-size: 0.55rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    padding: 3px 6px;
+    border-radius: 3px;
+    display: flex; align-items: center; gap: 4px;
+    text-transform: uppercase;
+  }
+  .live-badge::before {
+    content: '';
+    width: 5px; height: 5px;
+    background: #fff;
+    border-radius: 50%;
+    animation: blink 1s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
   .jugada-num {
-    font-size: 0.8rem;
-    color: rgba(255,255,255,0.5);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--gold);
     text-align: right;
   }
 
-  /* ── CONTENIDO ── */
+  /* ── CONTENT ── */
   .content {
     width: 100%;
     max-width: 480px;
@@ -63,103 +98,121 @@
     flex-direction: column;
     align-items: center;
     padding: 1.5rem 1rem;
-    gap: 1.2rem;
+    gap: 1rem;
+    margin: 0 auto;
   }
 
-  /* ── ESTADOS ── */
   .pantalla { display: none; width: 100%; flex-direction: column; align-items: center; gap: 1.2rem; }
   .pantalla.activa { display: flex; }
 
   /* ── LOBBY ── */
-  .waiting-icon { font-size: 4rem; margin-bottom: 0.5rem; }
-  .waiting-text {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: var(--teal);
-    text-align: center;
+  .lobby-icon {
+    font-size: 3.5rem;
+    margin-top: 2rem;
+    animation: pulse 2s ease-in-out infinite;
   }
-  .waiting-sub {
-    font-size: 0.9rem;
-    color: rgba(255,255,255,0.5);
+  @keyframes pulse { 0%,100%{transform:scale(1);opacity:0.7} 50%{transform:scale(1.1);opacity:1} }
+  .lobby-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: var(--gold);
+    text-transform: uppercase;
     text-align: center;
-    line-height: 1.5;
+    letter-spacing: 0.03em;
   }
-  .pulse { animation: pulse 2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+  .lobby-sub {
+    font-size: 0.85rem;
+    color: var(--gray);
+    text-align: center;
+    line-height: 1.6;
+  }
+  .lobby-brand {
+    margin-top: 2rem;
+    font-size: 0.7rem;
+    color: rgba(245,197,24,0.4);
+    letter-spacing: 0.1em;
+  }
 
   /* ── PREGUNTA ── */
   .jugada-label {
-    background: rgba(78,203,202,0.1);
-    border: 1px solid rgba(78,203,202,0.3);
-    color: var(--teal);
-    font-size: 0.7rem;
+    background: rgba(245,197,24,0.1);
+    border: 1px solid rgba(245,197,24,0.3);
+    color: var(--gold);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     padding: 0.3rem 0.8rem;
-    border-radius: 99px;
+    border-radius: 4px;
     text-align: center;
   }
-  .jugada-label.estrella { background: rgba(224,23,157,0.1); border-color: var(--magenta); color: var(--magenta); }
+  .jugada-label.estrella { background: rgba(224,23,157,0.12); border-color: #E0179D; color: #E0179D; }
 
   .pregunta-card {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(31,56,100,0.4), rgba(11,30,53,0.6));
+    border: 1px solid rgba(245,197,24,0.15);
+    border-left: 4px solid var(--gold);
+    border-radius: 8px;
     padding: 1.2rem 1rem;
     width: 100%;
   }
   .pregunta-card-texto {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: #fff;
-    line-height: 1.5;
-    text-align: center;
+    line-height: 1.55;
+    text-align: left;
   }
 
   /* ── TIMER ── */
+  .timer-wrap { width: 100%; }
   .timer-bar-container {
     width: 100%;
-    height: 6px;
-    background: rgba(255,255,255,0.1);
+    height: 5px;
+    background: rgba(255,255,255,0.08);
     border-radius: 99px;
     overflow: hidden;
   }
   .timer-bar {
     height: 100%;
-    background: var(--teal);
+    background: linear-gradient(90deg, var(--green), var(--gold));
     border-radius: 99px;
-    transition: width 0.9s linear, background 0.3s;
+    transition: width 0.9s linear;
     width: 100%;
   }
-  .timer-bar.urgente { background: var(--magenta); }
-  .timer-num-voter {
-    font-size: 0.85rem;
-    color: rgba(255,255,255,0.5);
+  .timer-bar.urgente { background: linear-gradient(90deg, #e01010, #ff4444); }
+  .timer-num {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--gray);
     text-align: right;
     width: 100%;
+    margin-top: 2px;
   }
 
-  /* ── BOTONES DE VOTO ── */
+  /* ── VOTE BUTTONS ── */
   .opciones-voter {
     display: flex;
     flex-direction: column;
-    gap: 0.8rem;
+    gap: 0.7rem;
     width: 100%;
   }
   .btn-opcion {
     width: 100%;
-    padding: 1.1rem 1.2rem;
-    border-radius: 14px;
-    border: 2px solid rgba(255,255,255,0.15);
-    background: rgba(255,255,255,0.05);
+    padding: 1rem 1.1rem;
+    border-radius: 8px;
+    border: 2px solid rgba(245,197,24,0.15);
+    background: linear-gradient(135deg, rgba(31,56,100,0.25), rgba(11,30,53,0.4));
     color: #fff;
     font-family: 'Lexend', sans-serif;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.9rem;
     cursor: pointer;
     transition: all 0.2s;
     text-align: left;
@@ -167,72 +220,87 @@
     touch-action: manipulation;
   }
   .btn-opcion:active { transform: scale(0.97); }
-  .btn-opcion:hover, .btn-opcion.hover { background: rgba(78,203,202,0.12); border-color: var(--teal); }
-  .btn-opcion.A:hover, .btn-opcion.A.hover { background: rgba(78,203,202,0.2); border-color: var(--teal); }
-  .btn-opcion.B:hover, .btn-opcion.B.hover { background: rgba(245,197,24,0.15); border-color: #F5C518; }
-  .btn-opcion.C:hover, .btn-opcion.C.hover { background: rgba(224,23,157,0.15); border-color: var(--magenta); }
+  .btn-opcion.A:hover, .btn-opcion.A.hover { background: rgba(0,104,71,0.25); border-color: var(--green-l); }
+  .btn-opcion.B:hover, .btn-opcion.B.hover { background: rgba(245,197,24,0.15); border-color: var(--gold); }
+  .btn-opcion.C:hover, .btn-opcion.C.hover { background: rgba(224,23,157,0.15); border-color: #E0179D; }
   .btn-letra {
-    width: 36px; height: 36px;
-    border-radius: 50%;
-    background: rgba(78,203,202,0.2);
+    width: 34px; height: 34px;
+    border-radius: 4px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1rem;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.1rem;
     font-weight: 900;
-    color: var(--teal);
     flex-shrink: 0;
   }
-  .btn-opcion.B .btn-letra { background: rgba(245,197,24,0.2); color: #F5C518; }
-  .btn-opcion.C .btn-letra { background: rgba(224,23,157,0.2); color: var(--magenta); }
+  .btn-opcion.A .btn-letra { background: rgba(0,168,107,0.25); color: var(--green-l); }
+  .btn-opcion.B .btn-letra { background: rgba(245,197,24,0.2); color: var(--gold); }
+  .btn-opcion.C .btn-letra { background: rgba(224,23,157,0.2); color: #E0179D; }
 
   /* ── CONFIRMACIÓN ── */
-  .confirmacion-icon { font-size: 4rem; }
-  .confirmacion-titulo {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--teal);
-    text-align: center;
+  .confirm-icon { font-size: 3.5rem; margin-top: 2rem; }
+  .confirm-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--gold);
+    text-transform: uppercase;
   }
-  .confirmacion-opcion {
-    font-size: 3rem;
+  .confirm-letra {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 3.5rem;
     font-weight: 900;
-    color: var(--teal);
-    text-align: center;
+    color: var(--green-l);
   }
-  .confirmacion-sub {
-    font-size: 0.9rem;
-    color: rgba(255,255,255,0.5);
+  .confirm-sub {
+    font-size: 0.85rem;
+    color: var(--gray);
     text-align: center;
-    line-height: 1.5;
+    line-height: 1.6;
   }
 
   /* ── CERRADO ── */
-  .cerrado-icon { font-size: 3rem; }
-  .cerrado-texto {
-    font-size: 1rem;
-    color: rgba(255,255,255,0.5);
+  .cerrado-icon { font-size: 2.5rem; margin-top: 3rem; }
+  .cerrado-text { font-size: 0.9rem; color: var(--gray); text-align: center; line-height: 1.6; }
+
+  /* ── RECONNECT BANNER ── */
+  .reconnect-banner {
+    display: none;
+    width: 100%;
+    background: rgba(245,197,24,0.15);
+    border-bottom: 1px solid rgba(245,197,24,0.3);
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    color: var(--gold);
     text-align: center;
+    animation: fadeIn 0.3s;
   }
+  .reconnect-banner.visible { display: block; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 </style>
 </head>
 <body>
 
 <div class="header">
   <div class="header-logo">
-    Doble Protección
-    <span>Enteronorma B·Vit</span>
+    NORMA MUNDIAL 2026
+    <span>Enteronorma B-Vit</span>
   </div>
-  <div class="jugada-num" id="jugada-num-header">—</div>
+  <div class="header-right">
+    <div class="live-badge">EN VIVO</div>
+    <div class="jugada-num" id="jugada-num-header">—</div>
+  </div>
 </div>
+
+<div class="reconnect-banner" id="reconnect-banner">Reconectando sesión...</div>
 
 <div class="content">
 
   <!-- LOBBY -->
   <div id="pantalla-lobby" class="pantalla activa">
-    <div style="margin-top:3rem"></div>
-    <div class="waiting-icon pulse">⚽</div>
-    <div class="waiting-text">¡Estás dentro del partido!</div>
-    <div class="waiting-sub">Espera a que el MC inicie el juego.<br/>Cuando aparezca la pregunta, tienes <strong>30 segundos</strong> para responder.</div>
-    <div style="margin-top:2rem;font-size:0.8rem;color:rgba(78,203,202,0.5)">Enteronorma B·Vit · Carnot Laboratorios</div>
+    <div class="lobby-icon">⚽</div>
+    <div class="lobby-title">¡Estás dentro del partido!</div>
+    <div class="lobby-sub">Espera a que el MC inicie el juego.<br/>Tienes <strong>30 segundos</strong> para responder cada jugada.</div>
+    <div class="lobby-brand">ENTERONORMA B-VIT · CARNOT LABORATORIOS</div>
   </div>
 
   <!-- PREGUNTA ACTIVA -->
@@ -241,47 +309,71 @@
     <div class="pregunta-card">
       <div id="pregunta-voter" class="pregunta-card-texto"></div>
     </div>
-    <div style="width:100%">
+    <div class="timer-wrap">
       <div class="timer-bar-container">
         <div class="timer-bar" id="timer-bar-voter"></div>
       </div>
-      <div class="timer-num-voter" id="timer-num-voter">30s</div>
+      <div class="timer-num" id="timer-num-voter">30s</div>
     </div>
     <div class="opciones-voter" id="opciones-voter"></div>
   </div>
 
   <!-- CONFIRMACIÓN VOTO -->
   <div id="pantalla-confirmacion" class="pantalla">
-    <div style="margin-top:3rem"></div>
-    <div class="confirmacion-icon">✅</div>
-    <div class="confirmacion-titulo">¡Voto registrado!</div>
-    <div class="confirmacion-opcion" id="opcion-elegida"></div>
-    <div class="confirmacion-sub">Tu respuesta fue registrada.<br/>Sigue la jugada en la pantalla principal.</div>
+    <div class="confirm-icon">✅</div>
+    <div class="confirm-title">¡Voto registrado!</div>
+    <div class="confirm-letra" id="opcion-elegida"></div>
+    <div class="confirm-sub">Tu respuesta fue registrada.<br/>Sigue la jugada en la pantalla principal.</div>
   </div>
 
   <!-- VOTACIÓN CERRADA -->
   <div id="pantalla-cerrado" class="pantalla">
-    <div style="margin-top:3rem"></div>
     <div class="cerrado-icon">🔒</div>
-    <div class="confirmacion-titulo" style="color:rgba(255,255,255,0.6)">Votación cerrada</div>
-    <div class="cerrado-texto">El MC ya cerró esta jugada.<br/>Espera la siguiente pregunta.</div>
+    <div class="confirm-title" style="color:var(--gray)">Votación cerrada</div>
+    <div class="cerrado-text">El MC ya cerró esta jugada.<br/>Espera la siguiente pregunta.</div>
   </div>
 
   <!-- FIN -->
   <div id="pantalla-fin" class="pantalla">
-    <div style="margin-top:3rem"></div>
-    <div class="waiting-icon">🏆</div>
-    <div class="confirmacion-titulo">¡Demo completado!</div>
-    <div class="confirmacion-sub">Gracias por participar.<br/>Enteronorma B·Vit — Carnot Laboratorios 2026</div>
+    <div class="confirm-icon">🏆</div>
+    <div class="confirm-title">¡Partido terminado!</div>
+    <div class="confirm-sub">Gracias por participar.<br/>NORMA MUNDIAL 2026 · Enteronorma B-Vit</div>
   </div>
 
 </div>
 
 <script>
-const socket = io();
+// ── SESSION RECOVERY ──
+const STORAGE_KEY = 'norma_mundial_session';
+let sessionToken = null;
+try { sessionToken = localStorage.getItem(STORAGE_KEY); } catch(e) {}
+
+const socket = io({ auth: { token: sessionToken } });
 let timerMax = 30;
 let yaVote   = false;
 let fase     = 'LOBBY';
+
+// Register/recover session
+socket.on('connect', () => {
+  document.getElementById('reconnect-banner').classList.remove('visible');
+  socket.emit('registrar_sesion', { token: sessionToken });
+});
+
+socket.on('sesion_registrada', ({ token }) => {
+  sessionToken = token;
+  try { localStorage.setItem(STORAGE_KEY, token); } catch(e) {}
+});
+
+socket.on('disconnect', () => {
+  document.getElementById('reconnect-banner').classList.add('visible');
+});
+
+// Recovered vote from server
+socket.on('voto_confirmado', ({ opcion, recuperado }) => {
+  yaVote = true;
+  document.getElementById('opcion-elegida').textContent = opcion;
+  mostrarPantalla('confirmacion');
+});
 
 function mostrarPantalla(id) {
   document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
@@ -339,8 +431,6 @@ socket.on('fase_cambio', (data) => {
       break;
     case 'RESULTADOS':
     case 'VIDEO':
-      if (!yaVote) mostrarPantalla('cerrado');
-      break;
     case 'TRANSICION':
       if (!yaVote) mostrarPantalla('cerrado');
       break;
@@ -378,14 +468,8 @@ function renderPreguntaVoter(jugada) {
 
 function votar(opcion) {
   if (yaVote || fase !== 'PREGUNTA') return;
-  socket.emit('votar', { opcion });
+  socket.emit('votar', { opcion, token: sessionToken });
 }
-
-socket.on('voto_confirmado', ({ opcion }) => {
-  yaVote = true;
-  document.getElementById('opcion-elegida').textContent = opcion;
-  mostrarPantalla('confirmacion');
-});
 
 socket.on('voto_rechazado', ({ motivo }) => {
   if (motivo === 'Votación cerrada') mostrarPantalla('cerrado');

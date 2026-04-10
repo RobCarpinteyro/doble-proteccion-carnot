@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NORMA MUNDIAL 2026 - Check-in</title>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Lexend', sans-serif;
+            background: linear-gradient(180deg, #060d18 0%, #0a1428 40%, #1a4d2e 85%, #2d6a4f 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: white;
+        }
+
+        /* Header with branding */
+        .header {
+            padding: 30px 40px;
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        .header-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #F5C518;
+            text-shadow: 0 4px 20px rgba(245, 197, 24, 0.3);
+            margin-bottom: 8px;
+        }
+
+        .header-subtitle {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #ffffff;
+            letter-spacing: 1px;
+        }
+
+        /* Main content area */
+        .main-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Scanning state */
+        .scanning-state {
+            text-align: center;
+            opacity: 1;
+            transition: opacity 0.8s ease;
+            z-index: 20;
+        }
+
+        .scanning-state.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .qr-icon {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 30px;
+            position: relative;
+        }
+
+        .qr-icon svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 0 20px rgba(245, 197, 24, 0.5));
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                filter: drop-shadow(0 0 20px rgba(245, 197, 24, 0.5)) brightness(1);
+            }
+            50% {
+                filter: drop-shadow(0 0 40px rgba(245, 197, 24, 0.8)) brightness(1.1);
+            }
+        }
+
+        .scanning-text {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 2rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            color: #F5C518;
+            animation: scan-pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes scan-pulse {
+            0%, 100% {
+                opacity: 0.7;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.05);
+            }
+        }
+
+        /* Welcome state */
+        .welcome-state {
+            opacity: 0;
+            transform: translateY(50px) scale(0.8);
+            transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        .welcome-state.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .welcome-message {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 3rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: #F5C518;
+            text-shadow: 0 0 30px rgba(245, 197, 24, 0.4);
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .doctor-name {
+            color: #ffffff;
+            display: inline-block;
+            position: relative;
+            animation: name-glow 0.6s ease-out 0.3s both;
+        }
+
+        @keyframes name-glow {
+            0% {
+                text-shadow: 0 0 0 transparent;
+                opacity: 0;
+            }
+            100% {
+                text-shadow: 0 0 20px rgba(245, 197, 24, 0.6);
+                opacity: 1;
+            }
+        }
+
+        /* Particle container for confetti effect */
+        .particles-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 25;
+        }
+
+        .particle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #F5C518;
+            border-radius: 50%;
+            animation: particle-fall 3s ease-out forwards;
+        }
+
+        .particle.square {
+            border-radius: 0;
+            width: 8px;
+            height: 8px;
+        }
+
+        @keyframes particle-fall {
+            0% {
+                opacity: 1;
+                transform: translate(0, -20px) rotate(0deg) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(var(--tx), 200px) rotate(360deg) scale(0.2);
+                filter: drop-shadow(0 0 10px rgba(245, 197, 24, 0.3));
+            }
+        }
+
+        /* Footer bar */
+        .footer {
+            padding: 20px 40px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #999;
+            background: rgba(6, 13, 24, 0.8);
+            border-top: 1px solid rgba(245, 197, 24, 0.2);
+            z-index: 10;
+            position: relative;
+        }
+
+        .footer-text {
+            letter-spacing: 0.5px;
+        }
+
+        .footer-dot {
+            margin: 0 10px;
+            color: #F5C518;
+        }
+
+        /* Hidden admin form */
+        .admin-icon {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(245, 197, 24, 0.1);
+            border: 2px solid rgba(245, 197, 24, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+
+        .admin-icon:hover {
+            background: rgba(245, 197, 24, 0.2);
+            border-color: rgba(245, 197, 24, 0.6);
+            transform: rotate(90deg);
+        }
+
+        .admin-icon svg {
+            width: 28px;
+            height: 28px;
+            color: #F5C518;
+        }
+
+        .admin-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(6, 13, 24, 0.9);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .admin-modal.open {
+            display: flex;
+        }
+
+        .admin-form {
+            background: linear-gradient(135deg, rgba(31, 56, 100, 0.95), rgba(6, 13, 24, 0.95));
+            border: 2px solid #F5C518;
+            border-radius: 20px;
+            padding: 40px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 0 40px rgba(245, 197, 24, 0.3);
+        }
+
+        .admin-form h2 {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.8rem;
+            color: #F5C518;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #ffffff;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid rgba(245, 197, 24, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #ffffff;
+            font-family: 'Lexend', sans-serif;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #F5C518;
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 15px rgba(245, 197, 24, 0.3);
+        }
+
+        .form-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: #F5C518;
+            color: #060d18;
+        }
+
+        .btn-primary:hover {
+            background: #f5d968;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(245, 197, 24, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #F5C518;
+            border: 2px solid rgba(245, 197, 24, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(245, 197, 24, 0.1);
+            border-color: #F5C518;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #F5C518;
+            border-radius: 50%;
+            margin-left: 6px;
+            animation: dot-pulse 1.4s infinite;
+        }
+
+        @keyframes dot-pulse {
+            0%, 60%, 100% {
+                opacity: 0.3;
+            }
+            30% {
+                opacity: 1;
+            }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1200px) {
+            .header-title {
+                font-size: 2.5rem;
+            }
+
+            .welcome-message {
+                font-size: 2.2rem;
+            }
+
+            .scanning-text {
+                font-size: 1.5rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 20px 20px;
+            }
+
+            .header-title {
+                font-size: 2rem;
+            }
+
+            .header-subtitle {
+                font-size: 1rem;
+            }
+
+            .welcome-message {
+                font-size: 1.6rem;
+            }
+
+            .scanning-text {
+                font-size: 1.2rem;
+            }
+
+            .qr-icon {
+                width: 80px;
+                height: 80px;
+            }
+
+            .admin-form {
+                margin: 20px;
+                padding: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header with branding -->
+    <div class="header">
+        <div class="header-title">NORMA MUNDIAL 2026</div>
+        <div class="header-subtitle">TORNEO DE INNOVACIÓN CIENTÍFICA</div>
+    </div>
+
+    <!-- Main content -->
+    <div class="main-container">
+        <div class="particles-container" id="particlesContainer"></div>
+
+        <!-- Scanning state (default) -->
+        <div class="scanning-state" id="scanningState">
+            <div class="qr-icon">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="10" y="10" width="30" height="30" fill="none" stroke="#F5C518" stroke-width="2"/>
+                    <rect x="15" y="15" width="20" height="20" fill="none" stroke="#F5C518" stroke-width="1"/>
+                    <rect x="60" y="10" width="30" height="30" fill="none" stroke="#F5C518" stroke-width="2"/>
+                    <rect x="65" y="15" width="20" height="20" fill="none" stroke="#F5C518" stroke-width="1"/>
+                    <rect x="10" y="60" width="30" height="30" fill="none" stroke="#F5C518" stroke-width="2"/>
+                    <rect x="15" y="65" width="20" height="20" fill="none" stroke="#F5C518" stroke-width="1"/>
+                    <circle cx="75" cy="75" r="12" fill="none" stroke="#F5C518" stroke-width="2"/>
+                    <circle cx="75" cy="75" r="7" fill="none" stroke="#F5C518" stroke-width="1"/>
+                    <line x1="50" y1="20" x2="50" y2="40" stroke="#F5C518" stroke-width="1" opacity="0.5"/>
+                    <line x1="30" y1="50" x2="50" y2="50" stroke="#F5C518" stroke-width="1" opacity="0.5"/>
+                    <line x1="50" y1="60" x2="50" y2="80" stroke="#F5C518" stroke-width="1" opacity="0.5"/>
+                    <line x1="60" y1="75" x2="80" y2="75" stroke="#F5C518" stroke-width="1" opacity="0.5"/>
+                </svg>
+            </div>
+            <div class="scanning-text">Escanee su código QR</div>
+        </div>
+
+        <!-- Welcome state (hidden by default) -->
+        <div class="welcome-state" id="welcomeState">
+            <div class="welcome-message">
+                ¡Bienvenido al partido,<br>
+                <span class="doctor-name" id="doctorName">Dr. Nombre</span>!
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <div class="footer-text">
+            Enteronorma B-Vit
+            <span class="footer-dot">·</span>
+            Carnot Laboratorios
+            <span class="footer-dot">·</span>
+            Polar Multimedia
+        </div>
+    </div>
+
+    <!-- Admin control icon -->
+    <div class="admin-icon" id="adminIcon" title="Control administrativo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"/>
+        </svg>
+    </div>
+
+    <!-- Admin modal -->
+    <div class="admin-modal" id="adminModal">
+        <div class="admin-form">
+            <h2>Registrar Asistente</h2>
+            <form id="checkinForm">
+                <div class="form-group">
+                    <label for="doctorName">Nombre del Doctor/Asistente:</label>
+                    <input type="text" id="doctorName" name="doctorName" placeholder="Dr. Juan Pérez" required>
+                </div>
+                <div class="form-buttons">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('adminModal').classList.remove('open')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Registrar<span class="loading" id="formLoading" style="display:none;"></span></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Socket.io and Web Audio API -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // ============================================================================
+        // WEB AUDIO API - Ambient Sound & Effects
+        // ============================================================================
+        
+        class AudioManager {
+            constructor() {
+                this.audioContext = null;
+                this.ambientOscillators = [];
+                this.ambientGain = null;
+                this.isAmbientPlaying = false;
+                this.initAudioContext();
+            }
+
+            initAudioContext() {
+                if (!this.audioContext) {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            // Create white noise filtered to simulate crowd murmur (low-pass around 200Hz)
+            createCrowdNoise() {
+                const ac = this.audioContext;
+                const now = ac.currentTime;
+                const bufferSize = ac.sampleRate * 2;
+                const noiseBuffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
+                const noiseData = noiseBuffer.getChannelData(0);
+
+                // Generate white noise
+                for (let i = 0; i < bufferSize; i++) {
+                    noiseData[i] = Math.random() * 2 - 1;
+                }
+
+                return noiseBuffer;
+            }
+
+            startAmbientSound() {
+                if (this.isAmbientPlaying) return;
+
+                const ac = this.audioContext;
+                const now = ac.currentTime;
+
+                // Create noise source
+                const noiseSource = ac.createBufferSource();
+                noiseSource.buffer = this.createCrowdNoise();
+                noiseSource.loop = true;
+
+                // Low-pass filter to simulate crowd murmur
+                const filter = ac.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(150, now);
+                filter.Q.setValueAtTime(1, now);
+
+                // Gain with fade-in
+                const gainNode = ac.createGain();
+                gainNode.gain.setValueAtTime(0, now);
+                gainNode.gain.linearRampToValueAtTime(0.15, now + 0.5);
+
+                // Add some modulation for realism
+                const lfo = ac.createOscillator();
+                lfo.frequency.value = 0.3;
+                const lfoGain = ac.createGain();
+                lfoGain.gain.value = 0.02;
+                lfo.connect(lfoGain);
+                lfoGain.connect(filter.frequency);
+
+                // Connect chain
+                noiseSource.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(ac.destination);
+
+                noiseSource.start();
+                lfo.start();
+
+                this.ambientOscillators.push({ source: noiseSource, lfo: lfo, gain: gainNode });
+                this.isAmbientPlaying = true;
+            }
+
+            stopAmbientSound() {
+                if (!this.isAmbientPlaying) return;
+
+                this.ambientOscillators.forEach(({ source, lfo, gain }) => {
+                    const now = this.audioContext.currentTime;
+                    gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                    setTimeout(() => {
+                        source.stop();
+                        lfo.stop();
+                    }, 300);
+                });
+
+                this.ambientOscillators = [];
+                this.isAmbientPlaying = false;
+            }
+
+            // Play welcome whistle + crowd cheer
+            playWelcomeSound() {
+                const ac = this.audioContext;
+                const now = ac.currentTime;
+
+                // Whistle (high-pitched sine wave)
+                const whistleOsc = ac.createOscillator();
+                whistleOsc.frequency.setValueAtTime(800, now);
+                whistleOsc.frequency.exponentialRampToValueAtTime(600, now + 0.2);
+
+                const whistleGain = ac.createGain();
+                whistleGain.gain.setValueAtTime(0.3, now);
+                whistleGain.gain.exponentialRampToValueAtTime(0.05, now + 0.2);
+                whistleGain.gain.setValueAtTime(0, now + 0.2);
+
+                whistleOsc.connect(whistleGain);
+                whistleGain.connect(ac.destination);
+
+                whistleOsc.start(now);
+                whistleOsc.stop(now + 0.2);
+
+                // Cheer (burst of filtered noise at higher frequencies)
+                const cheerSource = ac.createBufferSource();
+                cheerSource.buffer = this.createCrowdNoise();
+
+                const cheerFilter = ac.createBiquadFilter();
+                cheerFilter.type = 'highpass';
+                cheerFilter.frequency.setValueAtTime(300, now);
+
+                const cheerGain = ac.createGain();
+                cheerGain.gain.setValueAtTime(0.2, now + 0.15);
+                cheerGain.gain.linearRampToValueAtTime(0, now + 0.6);
+
+                cheerSource.connect(cheerFilter);
+                cheerFilter.connect(cheerGain);
+                cheerGain.connect(ac.destination);
+
+                cheerSource.start(now + 0.15);
+                cheerSource.stop(now + 0.6);
+            }
+        }
+
+        // Initialize audio manager
+        const audioManager = new AudioManager();
+
+        // Start ambient sound on user interaction
+        function initAudioOnInteraction() {
+            document.addEventListener('click', () => {
+                audioManager.initAudioContext();
+                audioManager.startAmbientSound();
+            }, { once: true });
+        }
+
+        // ============================================================================
+        // PARTICLE EFFECTS
+        // ============================================================================
+
+        function createParticles(count = 30) {
+            const container = document.getElementById('particlesContainer');
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+
+            for (let i = 0; i < count; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle' + (Math.random() > 0.7 ? ' square' : '');
+
+                const angle = (Math.PI * 2 * i) / count;
+                const distance = 100 + Math.random() * 100;
+                const tx = Math.cos(angle) * distance;
+                const ty = Math.sin(angle) * distance * 0.7;
+
+                particle.style.setProperty('--tx', `${tx}px`);
+                particle.style.left = centerX + 'px';
+                particle.style.top = centerY + 'px';
+
+                const delay = Math.random() * 0.2;
+                particle.style.animationDelay = delay + 's';
+
+                container.appendChild(particle);
+
+                setTimeout(() => particle.remove(), 3200);
+            }
+        }
+
+        // ============================================================================
+        // CHECK-IN LOGIC
+        // ============================================================================
+
+        const scanningState = document.getElementById('scanningState');
+        const welcomeState = document.getElementById('welcomeState');
+        const doctorNameSpan = document.getElementById('doctorName');
+        let checkinTimeout = null;
+
+        function showWelcome(nombre) {
+            // Update doctor name
+            doctorNameSpan.textContent = nombre;
+
+            // Hide scanning, show welcome
+            scanningState.classList.add('hidden');
+            welcomeState.classList.add('active');
+
+            // Play sound effect
+            audioManager.playWelcomeSound();
+
+            // Create particle effect
+            createParticles(35);
+
+            // Auto-reset after 5 seconds
+            if (checkinTimeout) clearTimeout(checkinTimeout);
+            checkinTimeout = setTimeout(() => {
+                welcomeState.classList.remove('active');
+                scanningState.classList.remove('hidden');
+            }, 5000);
+        }
+
+        // ============================================================================
+        // SOCKET.IO CONNECTION
+        // ============================================================================
+
+        const socket = io();
+
+        socket.on('connect', () => {
+            console.log('Conectado al servidor de check-in');
+            initAudioOnInteraction();
+        });
+
+        // Listen for new check-ins
+        socket.on('checkin_nuevo', (data) => {
+            console.log('Nuevo check-in:', data);
+            showWelcome(data.nombre);
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Desconectado del servidor');
+        });
+
+        // ============================================================================
+        // ADMIN MODAL & MANUAL CHECK-IN
+        // ============================================================================
+
+        const adminIcon = document.getElementById('adminIcon');
+        const adminModal = document.getElementById('adminModal');
+        const checkinForm = document.getElementById('checkinForm');
+        const formLoading = document.getElementById('formLoading');
+
+        adminIcon.addEventListener('click', () => {
+            adminModal.classList.add('open');
+            document.getElementById('doctorName').focus();
+        });
+
+        adminModal.addEventListener('click', (e) => {
+            if (e.target === adminModal) {
+                adminModal.classList.remove('open');
+            }
+        });
+
+        checkinForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const nombre = document.getElementById('doctorName').value.trim();
+            if (!nombre) return;
+
+            formLoading.style.display = 'inline-block';
+
+            try {
+                const response = await fetch('/api/checkin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        nombre: nombre,
+                        timestamp: new Date().toISOString(),
+                        sede: 'manual'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    adminModal.classList.remove('open');
+                    showWelcome(nombre);
+                    checkinForm.reset();
+                } else {
+                    alert('Error al registrar el check-in');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error de conexión');
+            } finally {
+                formLoading.style.display = 'none';
+            }
+        });
+
+        // Keyboard shortcut: ESC to close admin modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && adminModal.classList.contains('open')) {
+                adminModal.classList.remove('open');
+            }
+        });
+
+        // Keyboard shortcut: Ctrl+Shift+A to open admin modal (hidden feature)
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && e.code === 'KeyA') {
+                adminModal.classList.toggle('open');
+                if (adminModal.classList.contains('open')) {
+                    document.getElementById('doctorName').focus();
+                }
+            }
+        });
+
+        // ============================================================================
+        // INITIALIZATION
+        // ============================================================================
+
+        // Request audio context on page load (some browsers require user interaction)
+        window.addEventListener('load', () => {
+            // Attempt to start ambient sound
+            try {
+                audioManager.initAudioContext();
+                audioManager.startAmbientSound();
+            } catch (e) {
+                console.log('Audio will start on first user interaction');
+                initAudioOnInteraction();
+            }
+        });
+    </script>
+</body>
+</html>

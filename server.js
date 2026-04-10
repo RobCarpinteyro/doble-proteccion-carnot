@@ -13,11 +13,17 @@ const os         = require('os');
 const JUGADAS    = require('./data/jugadas');
 const { crearEstadoStats, calcularDelta, aplicarDelta, getStatsSnapshot } = require('./data/stats');
 
+const { v4: uuidv4 } = require('uuid');
+
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, { cors: { origin: '*' } });
 
 const PORT = process.env.PORT || 3000;
+
+// ─── SESIONES PERSISTENTES (recuperación de desconexión) ─────────────
+const sesiones = new Map(); // token → { nombre, socketId, votoActual, jugadaIdx }
+const checkins = [];        // log de check-ins para el túnel
 
 // ─── ESTADO DEL JUEGO ────────────────────────────────────────────────
 const ESTADOS = {
@@ -150,6 +156,25 @@ function cambiarFase(nuevaFase, data = {}) {
   estado.fase = nuevaFase;
   io.emit('fase_cambio', { fase: nuevaFase, ...data });
   io.emit('estado_juego', getEstadoPublico());
+
+  // Sound triggers por fase
+  const soundMap = {
+    PREGUNTA:   'whistle',
+    RESULTADOS: 'result',
+    VIDEO:      null,
+    MARCADOR:   'crowd',
+    FIN:        'final_whistle',
+  };
+  if (soundMap[nuevaFase]) {
+    io.emit('sound_trigger', { sound: soundMap[nuevaFase] });
+  }
+  // Gol trigger
+  if (nuevaFase === 'RESULTADOS' && data.rango && data.marcador) {
+    const jugada = JUGADAS[estado.jugadaIdx];
+    if (jugada.golesImpacto && jugada.golesImpacto[data.rango]) {
+      setTimeout(() => io.emit('sound_trigger', { sound: 'gol' }), 800);
+    }
+  }
 }
 
 // ─── FLUJO DEL JUEGO ─────────────────────────────────────────────────
@@ -257,7 +282,20 @@ function siguienteJugada() {
 // ─── SOCKET.IO — EVENTOS ─────────────────────────────────────────────
 
 io.on('connection', (socket) => {
-  console.log(`[+] Conexión: ${socket.id} (${socket.handshake.address})`);
+  const token = socket.handshake.auth?.token || null;
+  let sesion = token ? sesiones.get(token) : null;
+
+  // Recuperar sesión existente o crear nueva
+  if (sesion) {
+    sesion.socketId = socket.id;
+    console.log(`[↻] Reconexión: ${socket.id} (sesión ${token.slice(0,8)}…)`);
+    // Si votó en esta jugada, restaurar estado
+    if (sesion.jugadaIdx === estado.jugadaIdx && sesion.votoActual) {
+      socket.emit('voto_confirmado', { opcion: sesion.votoActual, recuperado: true });
+    }
+  } else {
+    console.log(`[+] Conexión nueva: ${socket.id} (${socket.handshake.address})`);
+  }
 
   // Enviar estado actual al nuevo cliente
   socket.emit('estado_juego', getEstadoPublico());
@@ -377,12 +415,26 @@ io.on('connection', (socket) => {
 
   // ── VOTANTE (médicos) ─────────────────────────────────────────────
 
-  socket.on('votar', ({ opcion }) => {
+  // Registrar sesión del votante
+  socket.on('registrar_sesion', ({ token: clientToken, nombre }) => {
+    const tk = clientToken || uuidv4();
+    if (!sesiones.has(tk)) {
+      sesiones.set(tk, { nombre: nombre || null, socketId: socket.id, votoActual: null, jugadaIdx: -1 });
+    } else {
+      sesiones.get(tk).socketId = socket.id;
+    }
+    socket.sesionToken = tk;
+    socket.emit('sesion_registrada', { token: tk });
+  });
+
+  socket.on('votar', ({ opcion, token: voteToken }) => {
+    const tk = voteToken || socket.sesionToken || socket.id;
+
     if (estado.fase !== ESTADOS.PREGUNTA) {
       socket.emit('voto_rechazado', { motivo: 'Votación cerrada' });
       return;
     }
-    if (estado.votantes.has(socket.id)) {
+    if (estado.votantes.has(tk)) {
       socket.emit('voto_rechazado', { motivo: 'Ya votaste en esta jugada' });
       return;
     }
@@ -392,10 +444,16 @@ io.on('connection', (socket) => {
     }
 
     estado.votos[opcion]++;
-    estado.votantes.add(socket.id);
+    estado.votantes.add(tk);
     estado.totalVotos++;
-    // Registrar tiempo de voto para stat de velocidad
     estado.tiemposVoto.push(Date.now() - (estado.tiempoInicioVotacion || Date.now()));
+
+    // Guardar voto en sesión para recuperación
+    if (sesiones.has(tk)) {
+      const ses = sesiones.get(tk);
+      ses.votoActual = opcion;
+      ses.jugadaIdx  = estado.jugadaIdx;
+    }
 
     socket.emit('voto_confirmado', { opcion });
     io.emit('votos_actualizados', {
@@ -411,7 +469,25 @@ io.on('connection', (socket) => {
 
 // ─── RUTAS HTTP ───────────────────────────────────────────────────────
 
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Check-in API para el túnel de bienvenida
+app.post('/api/checkin', (req, res) => {
+  const { nombre, sede } = req.body;
+  if (!nombre) return res.status(400).json({ error: 'Nombre requerido' });
+
+  const entry = { nombre, sede: sede || 'CDMX', timestamp: Date.now() };
+  checkins.push(entry);
+  io.emit('checkin_nuevo', entry);
+  io.emit('sound_trigger', { sound: 'checkin' });
+  console.log(`[CHECK-IN] ${nombre} — ${sede || 'CDMX'}`);
+  res.json({ ok: true, entry });
+});
+
+app.get('/api/checkins', (req, res) => {
+  res.json({ total: checkins.length, checkins });
+});
 
 // Raíz → redirige al voter
 app.get('/', (req, res) => res.redirect('/voter.html'));
@@ -455,13 +531,15 @@ app.get('/qr', async (req, res) => {
   const ip  = getLocalIP();
   const url = `http://${ip}:${PORT}/voter.html`;
   try {
-    const qr = await QRCode.toDataURL(url, { width: 400, margin: 2 });
+    const qr = await QRCode.toDataURL(url, { width: 400, margin: 2, color: { dark: '#1F3864', light: '#FFFFFF' } });
     res.send(`
-      <html><body style="background:#111;display:flex;flex-direction:column;
+      <html><body style="background:#060d18;display:flex;flex-direction:column;
         align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:white">
-        <img src="${qr}" style="border-radius:16px;border:4px solid #4ECBCA"/>
-        <p style="font-size:1.5rem;margin-top:1rem;color:#4ECBCA">${url}</p>
-        <p style="color:#888">Escanea este QR desde tu celular para votar</p>
+        <div style="font-size:0.8rem;letter-spacing:0.3em;color:#F5C518;margin-bottom:1rem;text-transform:uppercase">NORMA MUNDIAL 2026</div>
+        <img src="${qr}" style="border-radius:16px;border:4px solid #F5C518"/>
+        <p style="font-size:1.3rem;margin-top:1rem;color:#F5C518;font-weight:bold">${url}</p>
+        <p style="color:#888;margin-top:0.5rem">Escanea este QR desde tu celular para votar</p>
+        <p style="color:rgba(245,197,24,0.4);font-size:0.75rem;margin-top:2rem">Enteronorma B-Vit · Carnot Laboratorios · Polar Multimedia</p>
       </body></html>
     `);
   } catch (e) {
