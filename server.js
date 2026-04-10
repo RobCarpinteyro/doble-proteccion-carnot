@@ -404,6 +404,9 @@ io.on('connection', (socket) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Raíz → redirige al voter
+app.get('/', (req, res) => res.redirect('/voter.html'));
+
 // Ruta explícita para videos — evita problemas de permisos en macOS APFS
 const fs = require('fs');
 app.get('/videos/:archivo', (req, res) => {
