@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Doble Protección: El Partido</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700&family=Lexend:wght@300;400;600;700;900&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --teal:    #4ECBCA;
+  --magenta: #E0179D;
+  --navy:    #0B1E35;
+  --mex:     #006847;
+  --gold:    #F5C518;
+  --sa:      #FFB612;
+  --dark:    #060d18;
+  --broadcast-bar: rgba(5,12,24,0.92);
+}
+
+html, body {
+  width: 100vw; height: 100vh;
+  overflow: hidden;
+  background: var(--dark);
+  font-family: 'Barlow Condensed', sans-serif;
+  color: #fff;
+}
+
+/* ══════════════════════════════════════════
+   SCORE BUG — broadcast top bar
+══════════════════════════════════════════ */
+#score-bug {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 56px;
+  z-index: 100;
+  display: flex;
+  align-items: stretch;
+  background: transparent;
+  pointer-events: none;
+}
+
+.bug-team {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  min-width: 260px;
+}
+.bug-mex { background: linear-gradient(135deg, #003d28 0%, #005a3a 100%); justify-content: flex-start; }
+.bug-sa  { background: linear-gradient(135deg, #7a5800 0%, #a37800 100%); justify-content: flex-end; }
+
+.bug-flag { font-size: 1.8rem; line-height: 1; }
+.bug-name {
+  font-size: 1.4rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.bug-mex .bug-name { color: #fff; }
+.bug-sa  .bug-name { color: #fff; }
+
+.bug-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  background: linear-gradient(180deg, #0a1929 0%, #060d18 100%);
+  border-bottom: 2px solid var(--teal);
+  position: relative;
+}
+
+.bug-score-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.bug-score {
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: var(--gold);
+  width: 52px;
+  text-align: center;
+  line-height: 1;
+  text-shadow: 0 0 20px rgba(245,197,24,0.5);
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+.bug-score.gol-anim { transform: scale(1.4); }
+.bug-sep {
+  font-size: 1.6rem;
+  color: rgba(255,255,255,0.3);
+  padding: 0 4px;
+  font-weight: 300;
+}
+.bug-live {
+  position: absolute;
+  right: 12px; top: 50%; transform: translateY(-50%);
+  background: #e01010;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  display: flex; align-items: center; gap: 4px;
+}
+.bug-live::before {
+  content: '';
+  width: 5px; height: 5px;
+  background: #fff;
+  border-radius: 50%;
+  animation: liveblink 1s ease-in-out infinite;
+}
+@keyframes liveblink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.bug-jugada-info {
+  position: absolute;
+  left: 12px; top: 50%; transform: translateY(-50%);
+  font-size: 0.65rem;
+  color: var(--teal);
+  letter-spacing: 0.1em;
+  font-family: 'Lexend', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* ══════════════════════════════════════════
+   MAIN AREA
+══════════════════════════════════════════ */
+#main {
+  width: 100vw; height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding-top: 56px;
+}
+
+/* Fondo dinámico */
+.bg-gradient {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 15% 60%, rgba(0,104,71,0.18) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 40%, rgba(78,203,202,0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 100%, rgba(26,58,92,0.4) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════
+   PANTALLAS
+══════════════════════════════════════════ */
+.pantalla { display: none; width: 100%; height: 100%; position: absolute;
+  top: 56px; left: 0; right: 0; bottom: 0;
+  align-items: center; justify-content: center; }
+.pantalla.activa { display: flex; }
+
+/* ── LOBBY ─────────────────────────────── */
+#pantalla-lobby {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+.lobby-pre {
+  font-family: 'Lexend', sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.3em;
+  color: var(--teal);
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+.lobby-title {
+  font-size: clamp(4rem, 10vw, 8rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 0.9;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+.lobby-title .word1 { color: #fff; display: block; }
+.lobby-title .word2 { color: var(--teal); display: block; }
+.lobby-title .word3 {
+  color: transparent;
+  -webkit-text-stroke: 2px var(--magenta);
+  display: block;
+}
+.lobby-sub {
+  font-family: 'Lexend', sans-serif;
+  margin-top: 1.5rem;
+  font-size: 1rem;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.05em;
+}
+.lobby-brand {
+  margin-top: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.lobby-brand-pill {
+  background: rgba(78,203,202,0.1);
+  border: 1px solid rgba(78,203,202,0.3);
+  color: var(--teal);
+  padding: 0.4rem 1.2rem;
+  border-radius: 99px;
+  font-size: 0.9rem;
+  font-family: 'Lexend', sans-serif;
+  letter-spacing: 0.05em;
+}
+
+/* ── PREGUNTA ──────────────────────────── */
+#pantalla-pregunta {
+  flex-direction: column;
+  justify-content: center;
+  padding: 2rem 4rem;
+  gap: 1.8rem;
+}
+
+/* Lower third — jugada info */
+.lower-third {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lt-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--broadcast-bar);
+  border-left: 4px solid var(--teal);
+  padding: 6px 16px 6px 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--teal);
+}
+.lt-tag.estrella { border-color: var(--magenta); color: var(--magenta); }
+.lt-equipo {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.1em;
+  font-family: 'Lexend', sans-serif;
+  text-transform: uppercase;
+}
+
+/* Timer circular */
+.timer-wrap {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+#timer-svg { transform: rotate(-90deg); }
+#timer-circle-bg { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 6; }
+#timer-circle {
+  fill: none; stroke: var(--teal); stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 283; stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.9s linear;
+}
+#timer-circle.urgente { stroke: var(--magenta); }
+#timer-num {
+  position: absolute;
+  font-size: 1.6rem; font-weight: 900;
+  color: var(--teal);
+}
+#timer-num.urgente { color: var(--magenta); }
+
+/* Pregunta principal */
+.pregunta-texto-broadcast {
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+  text-align: center;
+  max-width: 1000px;
+  margin: 0 auto;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+}
+
+/* Opciones estilo broadcast */
+.opciones-broadcast {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.opcion-broadcast {
+  background: rgba(11,30,53,0.85);
+  border: 1px solid rgba(78,203,202,0.2);
+  border-top: 3px solid var(--teal);
+  padding: 1rem 1.2rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.opcion-broadcast.letra-B { border-top-color: var(--gold); }
+.opcion-broadcast.letra-C { border-top-color: var(--magenta); }
+.obc-letra {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--teal);
+  line-height: 1;
+  flex-shrink: 0;
+}
+.opcion-broadcast.letra-B .obc-letra { color: var(--gold); }
+.opcion-broadcast.letra-C .obc-letra { color: var(--magenta); }
+.obc-texto {
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  line-height: 1.3;
+  font-family: 'Lexend', sans-serif;
+}
+
+/* Barras de votos en vivo */
+.barras-broadcast {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.barra-row-bc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.br-letra {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: var(--teal);
+  width: 20px;
+  flex-shrink: 0;
+}
+.br-track {
+  flex: 1;
+  height: 22px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.br-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal), #2db8b7);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  min-width: 0;
+}
+.br-pct {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.7);
+  width: 38px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.votos-live-count {
+  text-align: right;
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.3);
+  font-family: 'Lexend', sans-serif;
+  margin-top: 2px;
+}
+
+/* ── RESULTADOS ────────────────────────── */
+#pantalla-resultados {
+  flex-direction: column;
+  padding: 2rem 4rem;
+  gap: 1.5rem;
+  justify-content: center;
+}
+.res-rango-strip {
+  width: 100%;
+  padding: 0.7rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.res-rango-strip.A { background: linear-gradient(135deg, rgba(0,104,71,0.5), rgba(0,104,71,0.2)); border-left: 6px solid var(--teal); }
+.res-rango-strip.B { background: linear-gradient(135deg, rgba(245,197,24,0.3), rgba(245,197,24,0.1)); border-left: 6px solid var(--gold); }
+.res-rango-strip.C { background: linear-gradient(135deg, rgba(224,23,157,0.3), rgba(224,23,157,0.1)); border-left: 6px solid var(--magenta); }
+.res-rango-label {
+  font-size: 2.5rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}
+.A .res-rango-label { color: var(--teal); }
+.B .res-rango-label { color: var(--gold); }
+.C .res-rango-label { color: var(--magenta); }
+.res-rango-sub {
+  font-size: 1rem;
+  font-family: 'Lexend', sans-serif;
+  color: rgba(255,255,255,0.6);
+}
+.barras-resultado-bc {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.barra-res-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brr-letra { font-size: 1.2rem; font-weight: 900; color: var(--teal); width: 22px; flex-shrink: 0; }
+.brr-track { flex: 1; height: 36px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; position: relative; }
+.brr-fill { height: 100%; border-radius: 4px; transition: width 0.8s cubic-bezier(0.34,1.56,0.64,1); min-width: 0; }
+.brr-correcta .brr-fill { background: linear-gradient(90deg, #006847, #00a35c); }
+.brr-incorrecta .brr-fill { background: rgba(255,255,255,0.12); }
+.brr-pct { font-size: 1.1rem; font-weight: 700; color: #fff; width: 48px; text-align: right; flex-shrink: 0; }
+.brr-texto { font-size: 0.85rem; font-family: 'Lexend', sans-serif; color: rgba(255,255,255,0.5); flex: 1; max-width: 320px; }
+.mc-strip {
+  background: rgba(11,30,53,0.8);
+  border-left: 4px solid var(--teal);
+  padding: 0.8rem 1.2rem;
+  font-family: 'Lexend', sans-serif;
+  font-size: 1.1rem;
+  color: rgba(255,255,255,0.9);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* ── VIDEO — FULLSCREEN ─────────────────── */
+#pantalla-video {
+  position: fixed !important;
+  top: 0 !important; left: 0 !important;
+  width: 100vw !important; height: 100vh !important;
+  background: #000;
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+#pantalla-video.activa { display: flex; }
+
+#video-player {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: none;
+}
+#video-placeholder-bc {
+  width: 100%; height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  background: radial-gradient(ellipse at center, #0d2240 0%, #060d18 70%);
+}
+.vp-ball { font-size: 8rem; animation: vball 0.7s ease-in-out infinite alternate; }
+@keyframes vball { from{transform:translateY(0) scale(1)} to{transform:translateY(-16px) scale(1.05)} }
+.vp-desc {
+  font-size: clamp(1.5rem, 3vw, 2.5rem);
+  font-weight: 700;
+  color: var(--teal);
+  text-align: center;
+  max-width: 700px;
+  line-height: 1.3;
+}
+
+/* Overlay de score en video */
+#video-score-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 56px;
+  z-index: 210;
+  display: flex;
+  align-items: stretch;
+  pointer-events: none;
+  opacity: 0.95;
+}
+
+/* ── MARCADOR ──────────────────────────── */
+#pantalla-marcador {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  padding: 2rem 4rem;
+  background: radial-gradient(ellipse at center, #0d2240 0%, #060d18 70%);
+}
+.marc-titulo {
+  font-size: 1rem;
+  letter-spacing: 0.3em;
+  color: var(--teal);
+  text-transform: uppercase;
+  font-family: 'Lexend', sans-serif;
+}
+.marc-tablero {
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+}
+.marc-equipo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+.marc-flag { font-size: 4rem; }
+.marc-nombre {
+  font-size: 1.8rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.marc-mex { color: var(--teal); }
+.marc-sa  { color: var(--sa); }
+.marc-scores {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.marc-score-num {
+  font-size: clamp(5rem, 12vw, 9rem);
+  font-weight: 900;
+  color: var(--gold);
+  text-shadow: 0 0 60px rgba(245,197,24,0.4);
+  line-height: 1;
+  width: 140px;
+  text-align: center;
+  transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+.marc-score-num.gol-anim { transform: scale(1.2); color: #fff; }
+.marc-guion { font-size: 4rem; color: rgba(255,255,255,0.2); align-self: center; }
+.marc-divider {
+  width: 100%;
+  max-width: 800px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--teal), transparent);
+}
+.marc-narrador {
+  max-width: 800px;
+  text-align: center;
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  font-family: 'Lexend', sans-serif;
+  font-style: italic;
+  color: rgba(255,255,255,0.85);
+  line-height: 1.6;
+  padding: 0 1rem;
+  border-left: 3px solid var(--teal);
+  text-align: left;
+}
+.marc-mc {
+  max-width: 800px;
+  font-size: 1rem;
+  font-family: 'Lexend', sans-serif;
+  color: rgba(255,255,255,0.5);
+  text-align: center;
+  font-style: italic;
+}
+
+/* ── TRANSICIÓN ─────────────────────────── */
+#pantalla-transicion {
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+  justify-content: center;
+}
+.loader-bc {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  border: 4px solid rgba(78,203,202,0.15);
+  border-top-color: var(--teal);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── FIN ─────────────────────────────────── */
+#pantalla-fin {
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  text-align: center;
+}
+
+/* ══════════════════════════════════════════
+   STATS OVERLAY — slide-in derecho sobre RESULTADOS
+══════════════════════════════════════════ */
+#stats-overlay {
+  position: fixed;
+  top: 56px; right: 0;
+  width: 44%;
+  bottom: 0;
+  z-index: 150;
+  background: linear-gradient(135deg, rgba(4,10,22,0.98) 0%, rgba(8,20,42,0.98) 100%);
+  border-left: 2px solid rgba(78,203,202,0.25);
+  transform: translateX(105%);
+  transition: transform 0.65s cubic-bezier(0.34,1.56,0.64,1);
+  display: flex;
+  flex-direction: column;
+  padding: 1.4rem 1.5rem 1.2rem;
+  gap: 0.9rem;
+  pointer-events: none;
+  overflow: hidden;
+}
+#stats-overlay.visible { transform: translateX(0); }
+
+.stats-ov-title {
+  font-size: 0.7rem;
+  letter-spacing: 0.28em;
+  color: var(--teal);
+  text-transform: uppercase;
+  font-family: 'Lexend', sans-serif;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(78,203,202,0.18);
+  padding-bottom: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.stats-ov-racha {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.08em;
+  text-transform: none;
+  font-family: 'Lexend', sans-serif;
+}
+
+.stat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  opacity: 0;
+  transform: translateX(24px);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+  flex: 1;
+  justify-content: center;
+}
+.stat-row.appear { opacity: 1; transform: translateX(0); }
+
+.stat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.stat-icon-name {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.95);
+}
+.stat-icon { font-size: 1.3rem; line-height: 1; }
+.stat-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.stat-val {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #fff;
+  min-width: 36px;
+  text-align: right;
+}
+.stat-delta {
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 4px;
+  background: rgba(78,203,202,0.16);
+  color: var(--teal);
+  letter-spacing: 0.05em;
+}
+.stat-delta.neg  { background: rgba(224,23,157,0.16); color: var(--magenta); }
+.stat-delta.zero { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.3); }
+
+.stat-levels {
+  display: flex;
+  gap: 6px;
+}
+.stat-level-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: 2px solid rgba(255,255,255,0.2);
+  transition: background 0.5s ease, box-shadow 0.5s ease, border-color 0.5s ease;
+}
+.stat-level-dot.lit {
+  border-color: transparent;
+  background: var(--dot-color, var(--teal));
+  box-shadow: 0 0 12px var(--dot-color, var(--teal));
+}
+
+.stat-bar-track {
+  height: 28px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(255,255,255,0.07);
+}
+.stat-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  width: 0%;
+  transition: width 1.4s cubic-bezier(0.22,1,0.36,1);
+  position: relative;
+  overflow: hidden;
+}
+/* Shimmer sweep sobre la barra */
+.stat-bar-fill::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -80px; bottom: 0;
+  width: 80px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: barshimmer 1.8s ease-in-out infinite;
+}
+@keyframes barshimmer {
+  0%   { left: -80px; opacity:0; }
+  20%  { opacity: 1; }
+  100% { left: 110%; opacity:0; }
+}
+/* Reflejo superior */
+.stat-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 40%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.25) 0%, transparent 100%);
+  border-radius: 6px 6px 0 0;
+  pointer-events: none;
+}
+/* Marcadores de umbral (nivel 1 y nivel 2) */
+.stat-bar-track::before,
+.stat-bar-track::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 2px;
+  background: rgba(255,255,255,0.15);
+  z-index: 2;
+  pointer-events: none;
+}
+.stat-bar-track::before { left: 25%; }    /* 200/800 — Nivel 1 */
+.stat-bar-track::after  { left: 56.25%; } /* 450/800 — Nivel 2 */
+
+/* ══════════════════════════════════════════
+   LOGRO FULLSCREEN — interrupt 3s
+══════════════════════════════════════════ */
+#logro-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  background: rgba(4,10,22,0.97);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+#logro-fullscreen.visible { opacity: 1; pointer-events: auto; }
+
+#logro-accent-left {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 8px;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+#logro-accent-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.logro-pre-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.35em;
+  color: rgba(255,255,255,0.35);
+  text-transform: uppercase;
+  font-family: 'Lexend', sans-serif;
+  font-weight: 600;
+}
+#logro-badge-big {
+  font-size: clamp(5rem, 12vw, 9rem);
+  filter: drop-shadow(0 0 50px rgba(255,255,255,0.25));
+  line-height: 1;
+  display: block;
+}
+.logro-badge-anim {
+  animation: logrobadge 0.55s cubic-bezier(0.34,1.56,0.64,1) forwards !important;
+}
+@keyframes logrobadge {
+  from { transform: scale(0) rotate(-15deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0deg);   opacity: 1; }
+}
+#logro-nombre {
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: #fff;
+  line-height: 1;
+  text-shadow: 0 0 40px rgba(255,255,255,0.15);
+}
+#logro-nivel-tag {
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 5px 16px;
+  border-radius: 99px;
+  font-weight: 700;
+  color: #000;
+  font-family: 'Lexend', sans-serif;
+  transition: background 0.3s;
+}
+#logro-desc {
+  font-size: clamp(0.95rem, 2vw, 1.3rem);
+  color: rgba(255,255,255,0.65);
+  font-family: 'Lexend', sans-serif;
+  text-align: center;
+  max-width: 580px;
+  line-height: 1.6;
+  font-style: italic;
+  padding: 0 2rem;
+}
+
+/* ══════════════════════════════════════════
+   LOGROS CORNER — acumulador fijo
+══════════════════════════════════════════ */
+#logros-corner {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  pointer-events: none;
+}
+.logro-corner-badge {
+  background: rgba(4,10,22,0.96);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 6px 12px 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  opacity: 0;
+  transform: translateX(70px);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+  border-radius: 6px;
+  box-shadow: 0 3px 16px rgba(0,0,0,0.6);
+  min-width: 160px;
+}
+.logro-corner-badge.llegó { opacity: 1; transform: translateX(0); }
+.lcb-icon { font-size: 1.4rem; line-height: 1; flex-shrink: 0; }
+.lcb-info { display: flex; flex-direction: column; gap: 1px; }
+.lcb-nombre { font-size: 0.76rem; font-weight: 700; color: #fff; letter-spacing: 0.03em; }
+.lcb-stat   { font-size: 0.63rem; color: rgba(255,255,255,0.38); font-family: 'Lexend', sans-serif; }
+.lcb-nivel-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  margin-left: auto; flex-shrink: 0;
+  align-self: center;
+}
+
+/* ── GOL OVERLAY ─────────────────────────── */
+#gol-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 1rem;
+  background: rgba(0,0,0,0.88);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+#gol-overlay.visible { opacity: 1; pointer-events: auto; }
+.gol-text {
+  font-size: clamp(4rem, 12vw, 10rem);
+  font-weight: 900;
+  color: var(--gold);
+  text-shadow: 0 0 80px rgba(245,197,24,0.7);
+  animation: golpulse 0.45s ease-in-out infinite alternate;
+  letter-spacing: -0.02em;
+}
+@keyframes golpulse { from{transform:scale(1)} to{transform:scale(1.06)} }
+.gol-marcador-txt {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 0.1em;
+}
+</style>
+</head>
+<body>
+
+<!-- ══ SCORE BUG ══ -->
+<div id="score-bug">
+  <div class="bug-team bug-mex">
+    <div class="bug-flag">🇲🇽</div>
+    <div class="bug-name">México</div>
+  </div>
+  <div class="bug-center">
+    <div class="bug-jugada-info" id="bug-jugada-info">J01 · 8</div>
+    <div class="bug-score-wrap">
+      <div class="bug-score" id="score-mex">0</div>
+      <div class="bug-sep">–</div>
+      <div class="bug-score" id="score-sa">0</div>
+    </div>
+    <div class="bug-live">EN VIVO</div>
+  </div>
+  <div class="bug-team bug-sa" style="justify-content:flex-end">
+    <div class="bug-name">Sudáfrica</div>
+    <div class="bug-flag">🇿🇦</div>
+  </div>
+</div>
+
+<!-- ══ MAIN ══ -->
+<div id="main">
+  <div class="bg-gradient"></div>
+
+  <!-- LOBBY -->
+  <div id="pantalla-lobby" class="pantalla activa">
+    <div class="lobby-pre">Enteronorma B·Vit — Carnot Laboratorios</div>
+    <div class="lobby-title">
+      <span class="word1">Doble</span>
+      <span class="word2">Protección</span>
+      <span class="word3">El Partido</span>
+    </div>
+    <div class="lobby-sub">Sistema interactivo de votación en tiempo real</div>
+    <div class="lobby-brand">
+      <div class="lobby-brand-pill">🇲🇽 México vs Sudáfrica 🇿🇦</div>
+    </div>
+  </div>
+
+  <!-- PREGUNTA -->
+  <div id="pantalla-pregunta" class="pantalla">
+    <div class="lower-third">
+      <div id="lt-tag" class="lt-tag">J01 · Saque Inicial</div>
+      <div class="timer-wrap">
+        <svg id="timer-svg" width="72" height="72" viewBox="0 0 100 100">
+          <circle id="timer-circle-bg" cx="50" cy="50" r="45"/>
+          <circle id="timer-circle"    cx="50" cy="50" r="45"/>
+        </svg>
+        <span id="timer-num">30</span>
+      </div>
+      <div id="lt-equipo" class="lt-equipo">Team B6 · Defensa</div>
+    </div>
+
+    <div id="pregunta-texto" class="pregunta-texto-broadcast"></div>
+
+    <div id="opciones-bc" class="opciones-broadcast"></div>
+
+    <div class="barras-broadcast">
+      <div class="barra-row-bc">
+        <span class="br-letra">A</span>
+        <div class="br-track"><div class="br-fill" id="br-A" style="width:0%"></div></div>
+        <span class="br-pct" id="brpct-A">0%</span>
+      </div>
+      <div class="barra-row-bc">
+        <span class="br-letra">B</span>
+        <div class="br-track"><div class="br-fill" id="br-B" style="width:0%"></div></div>
+        <span class="br-pct" id="brpct-B">0%</span>
+      </div>
+      <div class="barra-row-bc">
+        <span class="br-letra">C</span>
+        <div class="br-track"><div class="br-fill" id="br-C" style="width:0%"></div></div>
+        <span class="br-pct" id="brpct-C">0%</span>
+      </div>
+      <div class="votos-live-count" id="votos-live-count">0 votos</div>
+    </div>
+  </div>
+
+  <!-- RESULTADOS -->
+  <div id="pantalla-resultados" class="pantalla">
+    <div id="res-rango-strip" class="res-rango-strip A">
+      <div id="res-rango-label" class="res-rango-label">RANGO A</div>
+      <div id="res-rango-sub"   class="res-rango-sub">Ejecución perfecta</div>
+    </div>
+    <div class="barras-resultado-bc">
+      <div class="barra-res-row" id="brr-A">
+        <span class="brr-letra">A</span>
+        <div class="brr-track"><div class="brr-fill" id="brr-fill-A" style="width:0%"></div></div>
+        <span class="brr-pct" id="brr-pct-A">0%</span>
+        <span class="brr-texto" id="brr-txt-A"></span>
+      </div>
+      <div class="barra-res-row" id="brr-B">
+        <span class="brr-letra" style="color:var(--gold)">B</span>
+        <div class="brr-track"><div class="brr-fill" id="brr-fill-B" style="width:0%"></div></div>
+        <span class="brr-pct" id="brr-pct-B">0%</span>
+        <span class="brr-texto" id="brr-txt-B"></span>
+      </div>
+      <div class="barra-res-row" id="brr-C">
+        <span class="brr-letra" style="color:var(--magenta)">C</span>
+        <div class="brr-track"><div class="brr-fill" id="brr-fill-C" style="width:0%"></div></div>
+        <span class="brr-pct" id="brr-pct-C">0%</span>
+        <span class="brr-texto" id="brr-txt-C"></span>
+      </div>
+    </div>
+    <div id="mc-strip" class="mc-strip"></div>
+  </div>
+
+  <!-- TRANSICIÓN -->
+  <div id="pantalla-transicion" class="pantalla">
+    <div class="loader-bc"></div>
+    <div style="color:var(--teal);font-size:1.2rem;font-weight:700;letter-spacing:0.1em">PREPARANDO SIGUIENTE JUGADA...</div>
+  </div>
+
+  <!-- FIN -->
+  <div id="pantalla-fin" class="pantalla">
+    <div style="font-size:1rem;letter-spacing:0.3em;color:var(--teal);font-family:'Lexend',sans-serif">DEMO FINALIZADO</div>
+    <div style="font-size:clamp(3rem,8vw,6rem);font-weight:900;color:var(--gold)" id="fin-marcador-txt">0 – 0</div>
+    <div style="font-size:1.2rem;color:rgba(255,255,255,0.5);font-family:'Lexend',sans-serif;font-style:italic">"No es una presentación. Es un partido."</div>
+  </div>
+
+</div><!-- end #main -->
+
+<!-- VIDEO FULLSCREEN (fuera de main, posición fixed) -->
+<div id="pantalla-video" class="pantalla">
+  <!-- score bug duplicado para el video fullscreen -->
+  <div id="video-score-overlay">
+    <div class="bug-team bug-mex">
+      <div class="bug-flag">🇲🇽</div>
+      <div class="bug-name">México</div>
+    </div>
+    <div class="bug-center">
+      <div class="bug-score-wrap">
+        <div class="bug-score" id="vscore-mex">0</div>
+        <div class="bug-sep">–</div>
+        <div class="bug-score" id="vscore-sa">0</div>
+      </div>
+      <div class="bug-live">EN VIVO</div>
+    </div>
+    <div class="bug-team bug-sa" style="justify-content:flex-end">
+      <div class="bug-name">Sudáfrica</div>
+      <div class="bug-flag">🇿🇦</div>
+    </div>
+  </div>
+  <!-- Player Vimeo (para producción/deploy) -->
+  <div id="vimeo-container" style="display:none;width:100%;height:100%;position:relative;">
+    <iframe id="vimeo-player"
+      src=""
+      style="width:100%;height:100%;border:0;"
+      allow="autoplay; fullscreen"
+      allowfullscreen>
+    </iframe>
+  </div>
+  <!-- Player local (para demo con archivos locales) -->
+  <video id="video-player" autoplay playsinline></video>
+  <div id="video-placeholder-bc">
+    <div class="vp-ball">⚽</div>
+    <div class="vp-desc" id="vp-desc">Reproduciendo jugada...</div>
+  </div>
+</div>
+
+<!-- MARCADOR (pantalla después del video) -->
+<div id="pantalla-marcador" class="pantalla">
+  <div class="marc-titulo">Marcador · Enteronorma B·Vit</div>
+  <div class="marc-tablero">
+    <div class="marc-equipo">
+      <div class="marc-flag">🇲🇽</div>
+      <div class="marc-nombre marc-mex">México</div>
+    </div>
+    <div class="marc-scores">
+      <div class="marc-score-num" id="marc-score-mex">0</div>
+      <div class="marc-guion">–</div>
+      <div class="marc-score-num" id="marc-score-sa">0</div>
+    </div>
+    <div class="marc-equipo">
+      <div class="marc-flag">🇿🇦</div>
+      <div class="marc-nombre marc-sa">Sudáfrica</div>
+    </div>
+  </div>
+  <div class="marc-divider"></div>
+  <div id="marc-narrador" class="marc-narrador"></div>
+  <div id="marc-mc" class="marc-mc"></div>
+</div>
+
+<!-- ══ STATS OVERLAY (slide desde derecha sobre RESULTADOS) ══ -->
+<div id="stats-overlay">
+  <div class="stats-ov-title">
+    <span>⚡ Stats · Jugada</span>
+    <span class="stats-ov-racha" id="stats-racha-label"></span>
+  </div>
+  <div id="stats-rows" style="display:flex;flex-direction:column;gap:0.9rem;flex:1;justify-content:space-between;"></div>
+</div>
+
+<!-- ══ LOGRO FULLSCREEN ══ -->
+<div id="logro-fullscreen">
+  <div id="logro-accent-left"></div>
+  <div id="logro-accent-top"></div>
+  <div class="logro-pre-label">🏆 Logro desbloqueado</div>
+  <span id="logro-badge-big">🥇</span>
+  <div id="logro-nombre">Nombre del Logro</div>
+  <div id="logro-nivel-tag">Precisión · Nivel 1</div>
+  <div id="logro-desc">Descripción del logro desbloqueado</div>
+</div>
+
+<!-- ══ LOGROS CORNER ACUMULADOR ══ -->
+<div id="logros-corner"></div>
+
+<!-- GOL OVERLAY -->
+<div id="gol-overlay">
+  <div class="gol-text">⚽ ¡¡GOOOLLL!!</div>
+  <div class="gol-marcador-txt" id="gol-marcador-txt"></div>
+  <div style="font-size:3rem">🎉🏆🎉</div>
+</div>
+
+<script>
+const socket = io();
+let timerMax = 30;
+let jugadaActual = null;
+
+function mostrarPantalla(id) {
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  const el = document.getElementById(`pantalla-${id}`);
+  if (el) el.classList.add('activa');
+}
+
+function actualizarScoreBug(marcador, jugadaIdx, jugadaTotal) {
+  document.getElementById('score-mex').textContent = marcador.MEX;
+  document.getElementById('score-sa').textContent  = marcador.SA;
+  document.getElementById('vscore-mex').textContent = marcador.MEX;
+  document.getElementById('vscore-sa').textContent  = marcador.SA;
+  if (jugadaIdx !== undefined) {
+    document.getElementById('bug-jugada-info').textContent =
+      `J${String(jugadaIdx + 1).padStart(2,'0')} · ${jugadaTotal}`;
+  }
+}
+
+function animarGol(marcador) {
+  const overlay = document.getElementById('gol-overlay');
+  document.getElementById('gol-marcador-txt').textContent =
+    `México ${marcador.MEX}  –  ${marcador.SA} Sudáfrica`;
+  overlay.classList.add('visible');
+  ['score-mex','vscore-mex','marc-score-mex'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el){ el.classList.add('gol-anim'); setTimeout(()=>el.classList.remove('gol-anim'),800); }
+  });
+  setTimeout(() => overlay.classList.remove('visible'), 5000);
+}
+
+function actualizarBarras(porcentajes) {
+  ['A','B','C'].forEach(l => {
+    const pct = porcentajes[l] || 0;
+    document.getElementById(`br-${l}`).style.width = `${pct}%`;
+    document.getElementById(`brpct-${l}`).textContent = `${pct}%`;
+  });
+  document.getElementById('votos-live-count').textContent =
+    `${porcentajes.total || 0} votos en vivo`;
+}
+
+function actualizarTimer(segundos) {
+  const num    = document.getElementById('timer-num');
+  const circle = document.getElementById('timer-circle');
+  const offset = 283 * (1 - segundos / timerMax);
+  circle.style.strokeDashoffset = offset;
+  num.textContent = segundos;
+  const urgente = segundos <= 5;
+  circle.classList.toggle('urgente', urgente);
+  num.classList.toggle('urgente', urgente);
+}
+
+// ── ESTADO DEL JUEGO ──
+socket.on('estado_juego', (estado) => {
+  jugadaActual = estado.jugada;
+  if (estado.jugada) timerMax = estado.jugada.tiempoVotacion;
+  actualizarScoreBug(estado.marcador, estado.jugadaIdx, estado.jugadaTotal);
+  actualizarBarras(estado.porcentajes);
+  if (estado.timerSegundos !== undefined) actualizarTimer(estado.timerSegundos);
+
+  switch(estado.fase) {
+    case 'LOBBY':
+      ocultarStatsOverlay();
+      _logrosQueue = []; _logroProcesando = false;
+      document.getElementById('logro-fullscreen').classList.remove('visible');
+      document.getElementById('logros-corner').innerHTML = '';
+      mostrarPantalla('lobby');
+      break;
+    case 'PREGUNTA':    mostrarPantalla('pregunta'); if(estado.jugada) renderPregunta(estado.jugada); break;
+    case 'RESULTADOS':  mostrarPantalla('resultados'); break;
+    case 'VIDEO':       mostrarPantalla('video'); break;
+    case 'MARCADOR':    mostrarPantalla('marcador'); break;
+    case 'TRANSICION':  mostrarPantalla('transicion'); break;
+    case 'FIN':
+      mostrarPantalla('fin');
+      document.getElementById('fin-marcador-txt').textContent =
+        `${estado.marcador.MEX} – ${estado.marcador.SA}`;
+      break;
+  }
+});
+
+function renderPregunta(jugada) {
+  const tag = document.getElementById('lt-tag');
+  tag.textContent = `${jugada.id} · ${jugada.nombre}`;
+  tag.className   = 'lt-tag' + (jugada.esEstrella ? ' estrella' : '');
+  document.getElementById('lt-equipo').textContent = jugada.equipoLabel;
+  document.getElementById('pregunta-texto').textContent = jugada.pregunta;
+
+  const grid = document.getElementById('opciones-bc');
+  grid.innerHTML = '';
+  jugada.opciones.forEach(op => {
+    const div = document.createElement('div');
+    div.className = `opcion-broadcast letra-${op.letra}`;
+    div.innerHTML = `<div class="obc-letra">${op.letra}</div><div class="obc-texto">${op.texto}</div>`;
+    grid.appendChild(div);
+  });
+}
+
+// ── FASE CAMBIO ──
+socket.on('fase_cambio', (data) => {
+  const { fase } = data;
+  switch(fase) {
+    case 'PREGUNTA':
+      ocultarStatsOverlay();
+      mostrarPantalla('pregunta');
+      if (data.jugada) renderPregunta(data.jugada);
+      break;
+    case 'RESULTADOS':
+      mostrarPantalla('resultados');
+      renderResultados(data);
+      break;
+    case 'VIDEO':
+      ocultarStatsOverlay();
+      mostrarPantalla('video');
+      renderVideo(data);
+      break;
+    case 'MARCADOR':
+      mostrarPantalla('marcador');
+      renderMarcador(data);
+      break;
+    case 'TRANSICION':
+      mostrarPantalla('transicion');
+      // Detener video si estaba corriendo
+      const vp = document.getElementById('video-player');
+      vp.pause(); vp.src = '';
+      break;
+    case 'FIN':
+      mostrarPantalla('fin');
+      if (data.marcador) {
+        document.getElementById('fin-marcador-txt').textContent =
+          `${data.marcador.MEX} – ${data.marcador.SA}`;
+      }
+      break;
+  }
+  if (data.marcador) actualizarScoreBug(data.marcador);
+});
+
+function renderResultados(data) {
+  const { rango, porcentajes, correcta, mcPost, marcador } = data;
+
+  const strip = document.getElementById('res-rango-strip');
+  strip.className = `res-rango-strip ${rango}`;
+  document.getElementById('res-rango-label').textContent =
+    rango === 'A' ? '⚡ RANGO A — PERFECTO' :
+    rango === 'B' ? '⚠️ RANGO B — AJUSTADO' : '🔴 RANGO C — DIFÍCIL';
+  document.getElementById('res-rango-sub').textContent =
+    rango === 'A' ? 'Más del 75% respondió correcto' :
+    rango === 'B' ? 'Entre 40% y 74% respondió correcto' : 'Menos del 40% respondió correcto';
+
+  if (jugadaActual) {
+    jugadaActual.opciones.forEach(op => {
+      const l   = op.letra;
+      const pct = porcentajes ? (porcentajes[l] || 0) : 0;
+      const row = document.getElementById(`brr-${l}`);
+      row.classList.toggle('brr-correcta',   l === correcta);
+      row.classList.toggle('brr-incorrecta', l !== correcta);
+      document.getElementById(`brr-fill-${l}`).style.width = `${pct}%`;
+      document.getElementById(`brr-pct-${l}`).textContent  = `${pct}%`;
+      document.getElementById(`brr-txt-${l}`).textContent  = op.texto;
+    });
+  }
+
+  document.getElementById('mc-strip').textContent = mcPost || '';
+  if (marcador) actualizarScoreBug(marcador);
+
+  // ── Stats overlay: aparece 1.8s después de mostrar resultados
+  if (data.stats) {
+    setTimeout(() => mostrarStatsOverlay(data.stats, data.rango), 1800);
+  }
+
+  // ── Logros: encolar 3.5s después (da tiempo a que el overlay se vea)
+  if (data.logrosNuevos && data.logrosNuevos.length) {
+    encolarLogros(data.logrosNuevos, 3500);
+  }
+}
+
+function renderVideo(data) {
+  const { videoArchivo, descripcionVideo, marcador } = data;
+  document.getElementById('vp-desc').textContent = descripcionVideo || 'Reproduciendo jugada...';
+
+  const player      = document.getElementById('video-player');
+  const placeholder = document.getElementById('video-placeholder-bc');
+  const vimeoContainer = document.getElementById('vimeo-container');
+  const vimeoPlayer    = document.getElementById('vimeo-player');
+
+  // Ocultar todo primero
+  player.style.display = 'none';
+  vimeoContainer.style.display = 'none';
+  placeholder.style.display = 'none';
+
+  if (!videoArchivo) {
+    placeholder.style.display = 'flex';
+  } else if (/^\d+$/.test(String(videoArchivo))) {
+    // Es un ID de Vimeo (solo números)
+    vimeoPlayer.src = `https://player.vimeo.com/video/${videoArchivo}?autoplay=1&controls=0&loop=0&title=0&byline=0&portrait=0&background=1`;
+    vimeoContainer.style.display = 'block';
+  } else {
+    // Es archivo .mp4 local
+    player.src = `/videos/${videoArchivo}`;
+    player.style.display = 'block';
+    player.play().catch(() => {});
+    player.onended = () => {
+      if (data.marcador && data.marcador.MEX > parseInt(document.getElementById('vscore-mex').textContent)) {
+        animarGol(data.marcador);
+      }
+    };
+  }
+
+  if (marcador) actualizarScoreBug(marcador);
+}
+
+function renderMarcador(data) {
+  const { marcador, narradorIA, mcPost } = data;
+  if (marcador) {
+    document.getElementById('marc-score-mex').textContent = marcador.MEX;
+    document.getElementById('marc-score-sa').textContent  = marcador.SA;
+    actualizarScoreBug(marcador);
+  }
+  document.getElementById('marc-narrador').textContent = narradorIA || '';
+  document.getElementById('marc-mc').textContent       = mcPost     || '';
+}
+
+// ══════════════════════════════════════════════════════════
+//  STATS OVERLAY
+// ══════════════════════════════════════════════════════════
+const STAT_KEYS = ['precision','velocidad','colocacion','potencia','resistencia'];
+
+// Devuelve un % de relleno visual aleatorio según rango
+function _fillPorRango(rango) {
+  if (rango === 'A') return Math.floor(Math.random() * 25) + 75;  // 75–99
+  if (rango === 'B') return Math.floor(Math.random() * 35) + 40;  // 40–74
+  return Math.floor(Math.random() * 36) + 4;                       // 4–39
+}
+
+function mostrarStatsOverlay(stats, rango) {
+  if (!stats || !stats.statsDef) return;
+  const overlay = document.getElementById('stats-overlay');
+  const rows    = document.getElementById('stats-rows');
+  rows.innerHTML = '';
+
+  // Racha
+  const rachaLabel = document.getElementById('stats-racha-label');
+  rachaLabel.textContent = stats.racha > 0 ? `🔥 Racha ×${stats.racha}` : '';
+
+  STAT_KEYS.forEach((key, i) => {
+    const def   = stats.statsDef[key];
+    const val   = stats.valores[key]  || 0;
+    const dv    = stats.delta[key]    || 0;
+    // Fill visual basado en rango (impacto visual en pantalla grande)
+    const pct   = _fillPorRango(rango || 'B');
+    const nivel = def.logros.filter(l => val >= l.umbral).length; // 0‑3
+    const isNeg = dv < 0;
+    const isZero = dv === 0;
+
+    const dots = def.logros.map((l, li) =>
+      `<div class="stat-level-dot ${li < nivel ? 'lit' : ''}" style="--dot-color:${def.color}"></div>`
+    ).join('');
+
+    const deltaClass = isNeg ? 'neg' : (isZero ? 'zero' : '');
+    const deltaText  = isNeg ? `${dv}` : `+${dv}`;
+
+    const row = document.createElement('div');
+    row.className = 'stat-row';
+    row.id        = `stat-row-${key}`;
+    row.innerHTML = `
+      <div class="stat-header">
+        <div class="stat-icon-name">
+          <span class="stat-icon">${def.icon}</span>
+          <span>${def.nombre}</span>
+        </div>
+        <div class="stat-right">
+          <span class="stat-val">${val}</span>
+          <span class="stat-delta ${deltaClass}">${deltaText}</span>
+          <div class="stat-levels">${dots}</div>
+        </div>
+      </div>
+      <div class="stat-bar-track">
+        <div class="stat-bar-fill" id="sfill-${key}"
+             style="background:${def.color};
+                    box-shadow:0 0 12px ${def.color};
+                    width:0%"></div>
+      </div>`;
+    rows.appendChild(row);
+
+    // Stagger: aparecer + rellenar barra
+    setTimeout(() => {
+      row.classList.add('appear');
+      setTimeout(() => {
+        const fill = document.getElementById(`sfill-${key}`);
+        if (fill) fill.style.width = `${pct}%`;
+      }, 120);
+    }, 100 + i * 180);
+  });
+
+  overlay.classList.add('visible');
+}
+
+function ocultarStatsOverlay() {
+  const overlay = document.getElementById('stats-overlay');
+  overlay.style.transition = 'transform 0.4s ease';
+  overlay.classList.remove('visible');
+  setTimeout(() => { overlay.style.transition = ''; }, 450);
+}
+
+// ══════════════════════════════════════════════════════════
+//  LOGROS — fullscreen interrupt + corner acumulador
+// ══════════════════════════════════════════════════════════
+let _logrosQueue      = [];
+let _logroProcesando  = false;
+
+function encolarLogros(logrosNuevos, startDelay) {
+  if (!logrosNuevos || !logrosNuevos.length) return;
+  setTimeout(() => {
+    _logrosQueue.push(...logrosNuevos);
+    if (!_logroProcesando) _procesarSiguienteLogro();
+  }, startDelay || 0);
+}
+
+function _procesarSiguienteLogro() {
+  if (!_logrosQueue.length) { _logroProcesando = false; return; }
+  _logroProcesando = true;
+  const logro = _logrosQueue.shift();
+  _mostrarLogroFS(logro, () => {
+    _agregarLogroCorner(logro);
+    setTimeout(_procesarSiguienteLogro, 350);
+  });
+}
+
+function _mostrarLogroFS(logro, onDone) {
+  const fs = document.getElementById('logro-fullscreen');
+
+  // Colores
+  document.getElementById('logro-accent-left').style.cssText =
+    `background:${logro.color}; box-shadow:0 0 40px ${logro.color}`;
+  document.getElementById('logro-accent-top').style.cssText =
+    `background:${logro.color}; box-shadow:0 0 20px ${logro.color}`;
+
+  // Contenido
+  const badgeEl = document.getElementById('logro-badge-big');
+  badgeEl.textContent = logro.badge;
+  badgeEl.classList.remove('logro-badge-anim');
+  void badgeEl.offsetWidth; // reflow para reiniciar anim
+  badgeEl.classList.add('logro-badge-anim');
+
+  document.getElementById('logro-nombre').textContent = logro.nombre;
+
+  const tag = document.getElementById('logro-nivel-tag');
+  tag.textContent  = `${logro.statNombre} · Nivel ${logro.nivel}`;
+  tag.style.background = logro.color;
+
+  document.getElementById('logro-desc').textContent = logro.desc;
+
+  // Mostrar
+  fs.classList.add('visible');
+
+  // Auto-ocultar tras 3s
+  setTimeout(() => {
+    fs.classList.remove('visible');
+    if (onDone) setTimeout(onDone, 380);
+  }, 3000);
+}
+
+function _agregarLogroCorner(logro) {
+  const corner = document.getElementById('logros-corner');
+  const div    = document.createElement('div');
+  div.className = 'logro-corner-badge';
+  div.style.borderLeft = `3px solid ${logro.color}`;
+  div.innerHTML = `
+    <span class="lcb-icon">${logro.badge}</span>
+    <div class="lcb-info">
+      <div class="lcb-nombre">${logro.nombre}</div>
+      <div class="lcb-stat">${logro.statNombre}</div>
+    </div>
+    <div class="lcb-nivel-dot" style="background:${logro.color};box-shadow:0 0 6px ${logro.color}"></div>`;
+
+  // Insertar al inicio (más reciente arriba)
+  corner.insertBefore(div, corner.firstChild);
+
+  // Animar entrada con doble rAF para garantizar el reflow
+  requestAnimationFrame(() => requestAnimationFrame(() => div.classList.add('llegó')));
+}
+
+// ── VOTOS EN VIVO ──
+socket.on('votos_actualizados', ({ porcentajes }) => actualizarBarras(porcentajes));
+
+// ── TIMER ──
+socket.on('timer_update', ({ segundos }) => actualizarTimer(segundos));
+</script>
+</body>
+</html>

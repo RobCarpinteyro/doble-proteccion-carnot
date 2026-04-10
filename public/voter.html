@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Enteronorma — Votar</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --teal:    #4ECBCA;
+    --magenta: #E0179D;
+    --navy:    #1A3A5C;
+    --mex:     #006847;
+    --dark:    #080f1a;
+  }
+
+  body {
+    font-family: 'Lexend', sans-serif;
+    background: var(--dark);
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0;
+    overscroll-behavior: none;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    width: 100%;
+    background: linear-gradient(135deg, #0a1a2e, #0d2240);
+    border-bottom: 2px solid var(--teal);
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-logo {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--teal);
+    line-height: 1.2;
+  }
+  .header-logo span { color: white; font-weight: 300; display: block; font-size: 0.75rem; }
+  .jugada-num {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.5);
+    text-align: right;
+  }
+
+  /* ── CONTENIDO ── */
+  .content {
+    width: 100%;
+    max-width: 480px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.5rem 1rem;
+    gap: 1.2rem;
+  }
+
+  /* ── ESTADOS ── */
+  .pantalla { display: none; width: 100%; flex-direction: column; align-items: center; gap: 1.2rem; }
+  .pantalla.activa { display: flex; }
+
+  /* ── LOBBY ── */
+  .waiting-icon { font-size: 4rem; margin-bottom: 0.5rem; }
+  .waiting-text {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--teal);
+    text-align: center;
+  }
+  .waiting-sub {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+    line-height: 1.5;
+  }
+  .pulse { animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+
+  /* ── PREGUNTA ── */
+  .jugada-label {
+    background: rgba(78,203,202,0.1);
+    border: 1px solid rgba(78,203,202,0.3);
+    color: var(--teal);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.8rem;
+    border-radius: 99px;
+    text-align: center;
+  }
+  .jugada-label.estrella { background: rgba(224,23,157,0.1); border-color: var(--magenta); color: var(--magenta); }
+
+  .pregunta-card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 1.2rem 1rem;
+    width: 100%;
+  }
+  .pregunta-card-texto {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  /* ── TIMER ── */
+  .timer-bar-container {
+    width: 100%;
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .timer-bar {
+    height: 100%;
+    background: var(--teal);
+    border-radius: 99px;
+    transition: width 0.9s linear, background 0.3s;
+    width: 100%;
+  }
+  .timer-bar.urgente { background: var(--magenta); }
+  .timer-num-voter {
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.5);
+    text-align: right;
+    width: 100%;
+  }
+
+  /* ── BOTONES DE VOTO ── */
+  .opciones-voter {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    width: 100%;
+  }
+  .btn-opcion {
+    width: 100%;
+    padding: 1.1rem 1.2rem;
+    border-radius: 14px;
+    border: 2px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05);
+    color: #fff;
+    font-family: 'Lexend', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .btn-opcion:active { transform: scale(0.97); }
+  .btn-opcion:hover, .btn-opcion.hover { background: rgba(78,203,202,0.12); border-color: var(--teal); }
+  .btn-opcion.A:hover, .btn-opcion.A.hover { background: rgba(78,203,202,0.2); border-color: var(--teal); }
+  .btn-opcion.B:hover, .btn-opcion.B.hover { background: rgba(245,197,24,0.15); border-color: #F5C518; }
+  .btn-opcion.C:hover, .btn-opcion.C.hover { background: rgba(224,23,157,0.15); border-color: var(--magenta); }
+  .btn-letra {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(78,203,202,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    font-weight: 900;
+    color: var(--teal);
+    flex-shrink: 0;
+  }
+  .btn-opcion.B .btn-letra { background: rgba(245,197,24,0.2); color: #F5C518; }
+  .btn-opcion.C .btn-letra { background: rgba(224,23,157,0.2); color: var(--magenta); }
+
+  /* ── CONFIRMACIÓN ── */
+  .confirmacion-icon { font-size: 4rem; }
+  .confirmacion-titulo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--teal);
+    text-align: center;
+  }
+  .confirmacion-opcion {
+    font-size: 3rem;
+    font-weight: 900;
+    color: var(--teal);
+    text-align: center;
+  }
+  .confirmacion-sub {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  /* ── CERRADO ── */
+  .cerrado-icon { font-size: 3rem; }
+  .cerrado-texto {
+    font-size: 1rem;
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">
+    Doble Protección
+    <span>Enteronorma B·Vit</span>
+  </div>
+  <div class="jugada-num" id="jugada-num-header">—</div>
+</div>
+
+<div class="content">
+
+  <!-- LOBBY -->
+  <div id="pantalla-lobby" class="pantalla activa">
+    <div style="margin-top:3rem"></div>
+    <div class="waiting-icon pulse">⚽</div>
+    <div class="waiting-text">¡Estás dentro del partido!</div>
+    <div class="waiting-sub">Espera a que el MC inicie el juego.<br/>Cuando aparezca la pregunta, tienes <strong>30 segundos</strong> para responder.</div>
+    <div style="margin-top:2rem;font-size:0.8rem;color:rgba(78,203,202,0.5)">Enteronorma B·Vit · Carnot Laboratorios</div>
+  </div>
+
+  <!-- PREGUNTA ACTIVA -->
+  <div id="pantalla-pregunta" class="pantalla">
+    <div id="jugada-label" class="jugada-label"></div>
+    <div class="pregunta-card">
+      <div id="pregunta-voter" class="pregunta-card-texto"></div>
+    </div>
+    <div style="width:100%">
+      <div class="timer-bar-container">
+        <div class="timer-bar" id="timer-bar-voter"></div>
+      </div>
+      <div class="timer-num-voter" id="timer-num-voter">30s</div>
+    </div>
+    <div class="opciones-voter" id="opciones-voter"></div>
+  </div>
+
+  <!-- CONFIRMACIÓN VOTO -->
+  <div id="pantalla-confirmacion" class="pantalla">
+    <div style="margin-top:3rem"></div>
+    <div class="confirmacion-icon">✅</div>
+    <div class="confirmacion-titulo">¡Voto registrado!</div>
+    <div class="confirmacion-opcion" id="opcion-elegida"></div>
+    <div class="confirmacion-sub">Tu respuesta fue registrada.<br/>Sigue la jugada en la pantalla principal.</div>
+  </div>
+
+  <!-- VOTACIÓN CERRADA -->
+  <div id="pantalla-cerrado" class="pantalla">
+    <div style="margin-top:3rem"></div>
+    <div class="cerrado-icon">🔒</div>
+    <div class="confirmacion-titulo" style="color:rgba(255,255,255,0.6)">Votación cerrada</div>
+    <div class="cerrado-texto">El MC ya cerró esta jugada.<br/>Espera la siguiente pregunta.</div>
+  </div>
+
+  <!-- FIN -->
+  <div id="pantalla-fin" class="pantalla">
+    <div style="margin-top:3rem"></div>
+    <div class="waiting-icon">🏆</div>
+    <div class="confirmacion-titulo">¡Demo completado!</div>
+    <div class="confirmacion-sub">Gracias por participar.<br/>Enteronorma B·Vit — Carnot Laboratorios 2026</div>
+  </div>
+
+</div>
+
+<script>
+const socket = io();
+let timerMax = 30;
+let yaVote   = false;
+let fase     = 'LOBBY';
+
+function mostrarPantalla(id) {
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  document.getElementById(`pantalla-${id}`).classList.add('activa');
+}
+
+function actualizarTimer(segundos) {
+  const pct = (segundos / timerMax) * 100;
+  const bar = document.getElementById('timer-bar-voter');
+  bar.style.width = `${pct}%`;
+  bar.classList.toggle('urgente', segundos <= 5);
+  document.getElementById('timer-num-voter').textContent = `${segundos}s`;
+}
+
+socket.on('estado_juego', (estado) => {
+  fase = estado.fase;
+  const jugada = estado.jugada;
+
+  if (jugada) {
+    timerMax = jugada.tiempoVotacion;
+    document.getElementById('jugada-num-header').textContent = jugada.id;
+  }
+
+  switch(fase) {
+    case 'LOBBY':
+      yaVote = false;
+      mostrarPantalla('lobby');
+      break;
+    case 'PREGUNTA':
+      if (yaVote) {
+        mostrarPantalla('confirmacion');
+      } else {
+        mostrarPantalla('pregunta');
+        if (jugada) renderPreguntaVoter(jugada);
+        actualizarTimer(estado.timerSegundos);
+      }
+      break;
+    case 'RESULTADOS':
+    case 'VIDEO':
+    case 'TRANSICION':
+      if (!yaVote) mostrarPantalla('cerrado');
+      break;
+    case 'FIN':
+      mostrarPantalla('fin');
+      break;
+  }
+});
+
+socket.on('fase_cambio', (data) => {
+  fase = data.fase;
+  switch(fase) {
+    case 'PREGUNTA':
+      yaVote = false;
+      mostrarPantalla('pregunta');
+      break;
+    case 'RESULTADOS':
+    case 'VIDEO':
+      if (!yaVote) mostrarPantalla('cerrado');
+      break;
+    case 'TRANSICION':
+      if (!yaVote) mostrarPantalla('cerrado');
+      break;
+    case 'FIN':
+      mostrarPantalla('fin');
+      break;
+  }
+});
+
+socket.on('timer_update', ({ segundos }) => {
+  if (fase === 'PREGUNTA' && !yaVote) {
+    actualizarTimer(segundos);
+  }
+});
+
+function renderPreguntaVoter(jugada) {
+  const label = document.getElementById('jugada-label');
+  label.textContent = `${jugada.id} · ${jugada.nombre} · ${jugada.equipoLabel}`;
+  label.className   = 'jugada-label' + (jugada.esEstrella ? ' estrella' : '');
+
+  document.getElementById('pregunta-voter').textContent = jugada.pregunta;
+
+  const grid = document.getElementById('opciones-voter');
+  grid.innerHTML = '';
+  jugada.opciones.forEach(op => {
+    const btn = document.createElement('button');
+    btn.className = `btn-opcion ${op.letra}`;
+    btn.innerHTML = `<div class="btn-letra">${op.letra}</div><div>${op.texto}</div>`;
+    btn.addEventListener('click', () => votar(op.letra));
+    btn.addEventListener('touchstart', () => btn.classList.add('hover'), { passive: true });
+    btn.addEventListener('touchend',   () => btn.classList.remove('hover'), { passive: true });
+    grid.appendChild(btn);
+  });
+}
+
+function votar(opcion) {
+  if (yaVote || fase !== 'PREGUNTA') return;
+  socket.emit('votar', { opcion });
+}
+
+socket.on('voto_confirmado', ({ opcion }) => {
+  yaVote = true;
+  document.getElementById('opcion-elegida').textContent = opcion;
+  mostrarPantalla('confirmacion');
+});
+
+socket.on('voto_rechazado', ({ motivo }) => {
+  if (motivo === 'Votación cerrada') mostrarPantalla('cerrado');
+});
+</script>
+</body>
+</html>

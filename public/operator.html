@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Operador — Doble Protección</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700;900&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --teal:#4ECBCA; --magenta:#E0179D; --navy:#1A3A5C; --dark:#080f1a; --gold:#F5C518; --green:#1B6B3A; }
+  body { font-family:'Lexend',sans-serif; background:var(--dark); color:#fff; min-height:100vh; }
+
+  .top-bar {
+    background: linear-gradient(135deg,#0a1a2e,#0d2240);
+    border-bottom: 2px solid var(--teal);
+    padding: 0.8rem 1.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .top-bar h1 { font-size:1rem; color:var(--teal); font-weight:700; }
+  .top-bar h1 span { color:rgba(255,255,255,0.5); font-weight:300; }
+
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; padding:1rem; max-width:900px; margin:0 auto; }
+  @media(max-width:600px){ .grid { grid-template-columns:1fr; } }
+
+  .card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius:14px; padding:1.2rem;
+  }
+  .card h2 { font-size:0.75rem; color:var(--teal); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.8rem; }
+
+  /* Estado */
+  #estado-fase {
+    font-size:1.5rem; font-weight:900; color:var(--teal);
+    padding:0.5rem 0; border-bottom:1px solid rgba(255,255,255,0.1);
+    margin-bottom:0.8rem;
+  }
+  .info-row { display:flex; justify-content:space-between; align-items:center;
+    padding:0.3rem 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.85rem; }
+  .info-label { color:rgba(255,255,255,0.5); }
+  .info-val   { font-weight:700; color:#fff; }
+
+  /* Marcador */
+  .marcador-op {
+    display:flex; align-items:center; justify-content:center; gap:1.5rem;
+    font-size:2.5rem; font-weight:900; color:var(--gold);
+  }
+  .marcador-equipo { display:flex;flex-direction:column;align-items:center;gap:0.2rem; }
+  .marcador-equipo-nombre { font-size:0.7rem; color:rgba(255,255,255,0.5); font-weight:400; }
+
+  /* Pregunta actual */
+  #pregunta-op { font-size:0.9rem; color:rgba(255,255,255,0.8); line-height:1.4;
+    padding:0.8rem; background:rgba(255,255,255,0.04); border-radius:8px; margin-bottom:0.6rem; }
+  #opciones-op { font-size:0.8rem; color:rgba(255,255,255,0.5); }
+  .op-item { display:flex;gap:0.5rem;margin-bottom:0.3rem;align-items:flex-start; }
+  .op-letra-badge { background:rgba(78,203,202,0.2); color:var(--teal);
+    border-radius:4px; padding:0 0.4rem; font-weight:700; flex-shrink:0; }
+  .correcta-badge { color:#2ecc71; font-size:0.7rem; margin-left:auto; }
+
+  /* Votos */
+  .barra-op-row { display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem; }
+  .barra-op-letra { font-weight:700;color:var(--teal);width:16px;font-size:0.9rem; }
+  .barra-op-track { flex:1;height:22px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden; }
+  .barra-op-fill  { height:100%;background:var(--teal);border-radius:4px;transition:width 0.3s; }
+  .barra-op-pct   { font-size:0.8rem;color:#fff;width:36px;text-align:right; }
+  .votos-total-op { font-size:0.75rem;color:rgba(255,255,255,0.4);text-align:center;margin-top:0.3rem; }
+
+  /* Timer */
+  #timer-op { font-size:3rem;font-weight:900;color:var(--teal);text-align:center;line-height:1; }
+  #timer-op.urgente { color:var(--magenta); }
+
+  /* Botones */
+  .btn-row { display:flex;flex-wrap:wrap;gap:0.6rem;margin-top:0.5rem; }
+  .btn {
+    flex:1;min-width:80px;padding:0.7rem 0.8rem;border-radius:10px;
+    font-family:'Lexend',sans-serif;font-size:0.85rem;font-weight:700;
+    border:none;cursor:pointer;transition:all 0.2s;
+  }
+  .btn:active { transform:scale(0.97); }
+  .btn-primary  { background:var(--teal);color:#000; }
+  .btn-primary:hover { background:#3ab8b7; }
+  .btn-danger   { background:var(--magenta);color:#fff; }
+  .btn-danger:hover { background:#c5128a; }
+  .btn-warning  { background:var(--gold);color:#000; }
+  .btn-warning:hover { background:#d4a800; }
+  .btn-dark     { background:rgba(255,255,255,0.1);color:#fff; }
+  .btn-dark:hover { background:rgba(255,255,255,0.18); }
+  .btn-green    { background:#1B6B3A;color:#fff; }
+  .btn-disabled { opacity:0.3; cursor:not-allowed; }
+
+  .btn-rango {
+    flex:1;padding:0.6rem;border-radius:8px;font-family:'Lexend',sans-serif;
+    font-size:1rem;font-weight:900;border:none;cursor:pointer;
+  }
+  .btn-rango-A { background:var(--teal);color:#000; }
+  .btn-rango-B { background:var(--gold);color:#000; }
+  .btn-rango-C { background:var(--magenta);color:#fff; }
+
+  /* Jugadas lista */
+  .jugadas-lista { display:flex;flex-direction:column;gap:0.4rem; }
+  .jugada-item {
+    display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.8rem;
+    border-radius:8px;background:rgba(255,255,255,0.04);cursor:pointer;
+    border:1px solid transparent;transition:all 0.2s;font-size:0.8rem;
+  }
+  .jugada-item:hover { background:rgba(78,203,202,0.1);border-color:var(--teal); }
+  .jugada-item.activa { background:rgba(78,203,202,0.15);border-color:var(--teal);font-weight:700; }
+  .jugada-item.estrella { border-color:rgba(224,23,157,0.3); }
+  .jugada-item-id { color:var(--teal);font-weight:700;width:28px;flex-shrink:0; }
+  .jugada-item-nombre { flex:1;color:rgba(255,255,255,0.8); }
+  .jugada-item-equipo { font-size:0.7rem;color:rgba(255,255,255,0.4); }
+
+  /* Log */
+  #log-container {
+    height:150px;overflow-y:auto;font-size:0.75rem;
+    color:rgba(255,255,255,0.5);line-height:1.6;
+    background:rgba(0,0,0,0.3);border-radius:8px;padding:0.5rem 0.8rem;
+    margin-top:0.5rem;
+  }
+  .log-line.nuevo { color:var(--teal); }
+  .log-line.error { color:var(--magenta); }
+
+  /* Demo toggle */
+  .demo-toggle {
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0.6rem 0.8rem;background:rgba(78,203,202,0.08);
+    border:1px solid rgba(78,203,202,0.2);border-radius:8px;
+    font-size:0.85rem;
+  }
+  .toggle-switch {
+    width:44px;height:24px;border-radius:99px;background:rgba(255,255,255,0.1);
+    position:relative;cursor:pointer;transition:background 0.3s;
+    border:none;
+  }
+  .toggle-switch.on { background:var(--teal); }
+  .toggle-knob {
+    position:absolute;top:3px;left:3px;width:18px;height:18px;
+    border-radius:50%;background:#fff;transition:transform 0.3s;
+  }
+  .toggle-switch.on .toggle-knob { transform:translateX(20px); }
+
+  /* Nota operador */
+  #nota-operador {
+    display:none;padding:0.6rem 0.8rem;border-radius:8px;
+    background:rgba(245,197,24,0.1);border:1px solid rgba(245,197,24,0.4);
+    font-size:0.8rem;color:var(--gold);font-weight:700;margin-top:0.5rem;
+  }
+  #nota-operador.visible { display:block; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>🎛️ Operador — <span>Doble Protección: El Partido</span></h1>
+  <div style="font-size:0.75rem;color:var(--teal)" id="conexion-estado">Conectando...</div>
+</div>
+
+<div class="grid">
+
+  <!-- COLUMNA IZQUIERDA -->
+  <div style="display:flex;flex-direction:column;gap:1rem;">
+
+    <!-- Estado del juego -->
+    <div class="card">
+      <h2>Estado del juego</h2>
+      <div id="estado-fase">LOBBY</div>
+      <div class="info-row"><span class="info-label">Jugada</span><span class="info-val" id="info-jugada">—</span></div>
+      <div class="info-row"><span class="info-label">Equipo</span><span class="info-val" id="info-equipo">—</span></div>
+      <div class="info-row"><span class="info-label">Tipo</span><span class="info-val" id="info-tipo">—</span></div>
+    </div>
+
+    <!-- Marcador -->
+    <div class="card">
+      <h2>Marcador</h2>
+      <div class="marcador-op">
+        <div class="marcador-equipo">
+          <div id="score-mex-op">0</div>
+          <div class="marcador-equipo-nombre">ENTERONORMA</div>
+        </div>
+        <div style="color:rgba(255,255,255,0.3);font-size:1.5rem;">–</div>
+        <div class="marcador-equipo">
+          <div id="score-sa-op">0</div>
+          <div class="marcador-equipo-nombre">PATÓGENO</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timer -->
+    <div class="card">
+      <h2>Timer</h2>
+      <div id="timer-op">—</div>
+    </div>
+
+    <!-- Votos en vivo -->
+    <div class="card">
+      <h2>Votos en vivo</h2>
+      <div class="barra-op-row"><span class="barra-op-letra">A</span>
+        <div class="barra-op-track"><div class="barra-op-fill" id="bop-A" style="width:0%"></div></div>
+        <span class="barra-op-pct" id="ppct-A">0%</span>
+      </div>
+      <div class="barra-op-row"><span class="barra-op-letra">B</span>
+        <div class="barra-op-track"><div class="barra-op-fill" id="bop-B" style="width:0%"></div></div>
+        <span class="barra-op-pct" id="ppct-B">0%</span>
+      </div>
+      <div class="barra-op-row"><span class="barra-op-letra">C</span>
+        <div class="barra-op-track"><div class="barra-op-fill" id="bop-C" style="width:0%"></div></div>
+        <span class="barra-op-pct" id="ppct-C">0%</span>
+      </div>
+      <div class="votos-total-op" id="votos-total-op">0 votos</div>
+    </div>
+
+  </div>
+
+  <!-- COLUMNA DERECHA -->
+  <div style="display:flex;flex-direction:column;gap:1rem;">
+
+    <!-- Controles principales -->
+    <div class="card">
+      <h2>Controles</h2>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-iniciar" onclick="cmd('op_iniciar')">▶ Iniciar</button>
+        <button class="btn btn-warning" id="btn-cerrar"  onclick="cmd('op_cerrar_votacion')">⏱ Cerrar votación</button>
+      </div>
+      <div class="btn-row" style="margin-top:0.4rem;">
+        <button class="btn btn-green"   id="btn-video"        onclick="cmd('op_reproducir_video')">🎬 Lanzar video</button>
+        <button class="btn btn-primary" id="btn-ver-marcador" onclick="cmd('op_ver_marcador')">📊 Ver marcador</button>
+      </div>
+      <div class="btn-row" style="margin-top:0.4rem;">
+        <button class="btn btn-primary" id="btn-siguiente-pregunta" onclick="cmd('op_siguiente_pregunta')"
+          style="background:#1A3A5C;flex:2">⏭ Lanzar siguiente pregunta</button>
+      </div>
+      <div class="btn-row" style="margin-top:0.4rem;">
+        <button class="btn btn-dark" id="btn-reset" onclick="cmd('op_reset')">↩ Reset</button>
+      </div>
+    </div>
+
+    <!-- Modo demo + forzar rango -->
+    <div class="card">
+      <h2>Modo demo</h2>
+      <div class="demo-toggle">
+        <span>Modo Demo (fuerza Rango A)</span>
+        <button class="toggle-switch on" id="toggle-demo" onclick="toggleDemo()">
+          <div class="toggle-knob"></div>
+        </button>
+      </div>
+      <div style="margin-top:0.8rem;font-size:0.75rem;color:rgba(255,255,255,0.4);margin-bottom:0.5rem;">Forzar rango manualmente:</div>
+      <div class="btn-row">
+        <button class="btn btn-rango btn-rango-A" onclick="forzarRango('A')">A</button>
+        <button class="btn btn-rango btn-rango-B" onclick="forzarRango('B')">B</button>
+        <button class="btn btn-rango btn-rango-C" onclick="forzarRango('C')">C</button>
+      </div>
+      <div id="nota-operador"></div>
+    </div>
+
+    <!-- Pregunta actual -->
+    <div class="card">
+      <h2>Pregunta activa</h2>
+      <div id="pregunta-op">—</div>
+      <div class="opciones-op" id="opciones-op"></div>
+    </div>
+
+    <!-- Saltar a jugada -->
+    <div class="card">
+      <h2>Saltar a jugada</h2>
+      <div class="jugadas-lista" id="jugadas-lista"></div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <h2>Log de eventos</h2>
+      <div id="log-container"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const socket   = io();
+let demoActivo = true;
+let jugadaActualIdx = 0;
+
+const JUGADAS_NOMBRES = [
+  {id:'J01',nombre:'Saque inicial',estrella:false},
+  {id:'J02',nombre:'Presión alta',estrella:false},
+  {id:'J03',nombre:'Recuperación',estrella:false},
+  {id:'J04',nombre:'Salida jugando',estrella:false},
+  {id:'J05',nombre:'Control mediocampo',estrella:false},
+  {id:'J06',nombre:'Pase filtrado',estrella:false},
+  {id:'J07',nombre:'PRIMER REMATE ★',estrella:true},
+  {id:'J08',nombre:'Reacción patógeno',estrella:false},
+];
+
+// Renderizar lista de jugadas
+const lista = document.getElementById('jugadas-lista');
+JUGADAS_NOMBRES.forEach((j, idx) => {
+  const div = document.createElement('div');
+  div.className = `jugada-item${j.estrella ? ' estrella' : ''}`;
+  div.id = `jugada-item-${idx}`;
+  div.innerHTML = `
+    <span class="jugada-item-id">${j.id}</span>
+    <span class="jugada-item-nombre">${j.nombre}</span>
+    <button class="btn btn-dark" style="flex:0;padding:0.3rem 0.6rem;font-size:0.7rem"
+      onclick="irJugada(${idx})">Ir</button>
+  `;
+  lista.appendChild(div);
+});
+
+function log(msg, tipo = '') {
+  const el  = document.getElementById('log-container');
+  const div = document.createElement('div');
+  div.className = 'log-line ' + tipo;
+  div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function cmd(evento, data = {}) {
+  socket.emit(evento, data);
+  log(`→ ${evento}`, 'nuevo');
+}
+
+function irJugada(idx) {
+  socket.emit('op_ir_jugada', { idx });
+  log(`→ Saltar a J${idx+1}`, 'nuevo');
+}
+
+function forzarRango(rango) {
+  socket.emit('op_forzar_rango', { rango });
+  log(`→ Rango forzado: ${rango}`, 'nuevo');
+}
+
+function toggleDemo() {
+  socket.emit('op_toggle_demo');
+}
+
+function actualizarBarrasOp(porcentajes) {
+  ['A','B','C'].forEach(l => {
+    const pct = porcentajes[l] || 0;
+    document.getElementById(`bop-${l}`).style.width = `${pct}%`;
+    document.getElementById(`ppct-${l}`).textContent = `${pct}%`;
+  });
+  document.getElementById('votos-total-op').textContent = `${porcentajes.total || 0} votos`;
+}
+
+socket.on('connect', () => {
+  document.getElementById('conexion-estado').textContent = '🟢 Conectado';
+  log('Conectado al servidor', 'nuevo');
+});
+socket.on('disconnect', () => {
+  document.getElementById('conexion-estado').textContent = '🔴 Desconectado';
+  log('Desconectado del servidor', 'error');
+});
+
+socket.on('estado_juego', (estado) => {
+  jugadaActualIdx = estado.jugadaIdx;
+  actualizarUI(estado);
+});
+
+socket.on('fase_cambio', (data) => {
+  log(`Fase → ${data.fase}`, '');
+  if (data.rango) log(`Rango calculado: ${data.rango}`, 'nuevo');
+  if (data.marcador) {
+    document.getElementById('score-mex-op').textContent = data.marcador.MEX;
+    document.getElementById('score-sa-op').textContent  = data.marcador.SA;
+  }
+});
+
+socket.on('votos_actualizados', ({ porcentajes }) => {
+  actualizarBarrasOp(porcentajes);
+});
+
+socket.on('timer_update', ({ segundos }) => {
+  const el = document.getElementById('timer-op');
+  el.textContent = segundos;
+  el.classList.toggle('urgente', segundos <= 5);
+});
+
+socket.on('modo_demo', ({ activo }) => {
+  demoActivo = activo;
+  const btn = document.getElementById('toggle-demo');
+  btn.classList.toggle('on', activo);
+  log(`Modo demo: ${activo ? 'ON' : 'OFF'}`, 'nuevo');
+});
+
+function actualizarUI(estado) {
+  const { fase, jugada, porcentajes, marcador, modoDemo } = estado;
+
+  document.getElementById('estado-fase').textContent = fase;
+  document.getElementById('score-mex-op').textContent = marcador.MEX;
+  document.getElementById('score-sa-op').textContent  = marcador.SA;
+
+  demoActivo = modoDemo;
+  document.getElementById('toggle-demo').classList.toggle('on', modoDemo);
+
+  if (jugada) {
+    document.getElementById('info-jugada').textContent = `${jugada.id} · ${jugada.nombre}`;
+    document.getElementById('info-equipo').textContent = jugada.equipoLabel;
+    document.getElementById('info-tipo').textContent   = jugada.tipo;
+    document.getElementById('pregunta-op').textContent = jugada.pregunta;
+
+    const opEl = document.getElementById('opciones-op');
+    opEl.innerHTML = '';
+    jugada.opciones.forEach(op => {
+      const div = document.createElement('div');
+      div.className = 'op-item';
+      div.innerHTML = `<span class="op-letra-badge">${op.letra}</span>
+                       <span>${op.texto}</span>`;
+      opEl.appendChild(div);
+    });
+
+    // Nota operador especial
+    const nota = document.getElementById('nota-operador');
+    if (jugada.notaOperador) {
+      nota.textContent = `⚠️ ${jugada.notaOperador}`;
+      nota.classList.add('visible');
+    } else {
+      nota.classList.remove('visible');
+    }
+
+    // Resaltar jugada en lista
+    JUGADAS_NOMBRES.forEach((_, i) => {
+      const el = document.getElementById(`jugada-item-${i}`);
+      if (el) el.classList.toggle('activa', i === estado.jugadaIdx);
+    });
+  }
+
+  if (porcentajes) actualizarBarrasOp(porcentajes);
+  if (estado.timerSegundos !== undefined) {
+    const el = document.getElementById('timer-op');
+    el.textContent = estado.timerSegundos;
+    el.classList.toggle('urgente', estado.timerSegundos <= 5);
+  }
+}
+</script>
+</body>
+</html>
