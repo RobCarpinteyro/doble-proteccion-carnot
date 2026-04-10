@@ -332,6 +332,15 @@ io.on('connection', (socket) => {
     cambiarFase(ESTADOS.LOBBY);
   });
 
+  // Ajuste manual de marcador
+  socket.on('op_ajustar_marcador', ({ equipo, delta }) => {
+    if (equipo === 'MEX') estado.marcador.MEX = Math.max(0, estado.marcador.MEX + delta);
+    if (equipo === 'SA')  estado.marcador.SA  = Math.max(0, estado.marcador.SA  + delta);
+    io.emit('marcador_actualizado', { marcador: estado.marcador });
+    io.emit('estado_juego', getEstadoPublico());
+    console.log(`[Marcador manual] MEX:${estado.marcador.MEX} SA:${estado.marcador.SA}`);
+  });
+
   // Toggle modo demo
   socket.on('op_toggle_demo', () => {
     estado.modoDemo = !estado.modoDemo;

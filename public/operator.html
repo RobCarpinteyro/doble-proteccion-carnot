@@ -172,17 +172,39 @@
 
     <!-- Marcador -->
     <div class="card">
-      <h2>Marcador</h2>
+      <h2>Marcador <span style="font-size:0.7rem;color:rgba(255,255,255,0.4);font-weight:400;">control manual</span></h2>
       <div class="marcador-op">
+
+        <!-- MÉXICO / ENTERONORMA -->
         <div class="marcador-equipo">
-          <div id="score-mex-op">0</div>
-          <div class="marcador-equipo-nombre">ENTERONORMA</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button onclick="ajustarMarcador('MEX',-1)"
+              style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+                     color:#fff;font-size:1.3rem;width:36px;height:36px;border-radius:6px;cursor:pointer;">−</button>
+            <div id="score-mex-op" style="min-width:40px;text-align:center;">0</div>
+            <button onclick="ajustarMarcador('MEX',1)"
+              style="background:rgba(78,203,202,0.2);border:1px solid rgba(78,203,202,0.4);
+                     color:#4ECBCA;font-size:1.3rem;width:36px;height:36px;border-radius:6px;cursor:pointer;">+</button>
+          </div>
+          <div class="marcador-equipo-nombre">🇲🇽 ENTERONORMA</div>
         </div>
+
         <div style="color:rgba(255,255,255,0.3);font-size:1.5rem;">–</div>
+
+        <!-- SUDÁFRICA / PATÓGENO -->
         <div class="marcador-equipo">
-          <div id="score-sa-op">0</div>
-          <div class="marcador-equipo-nombre">PATÓGENO</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button onclick="ajustarMarcador('SA',-1)"
+              style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+                     color:#fff;font-size:1.3rem;width:36px;height:36px;border-radius:6px;cursor:pointer;">−</button>
+            <div id="score-sa-op" style="min-width:40px;text-align:center;">0</div>
+            <button onclick="ajustarMarcador('SA',1)"
+              style="background:rgba(245,197,24,0.2);border:1px solid rgba(245,197,24,0.4);
+                     color:#F5C518;font-size:1.3rem;width:36px;height:36px;border-radius:6px;cursor:pointer;">+</button>
+          </div>
+          <div class="marcador-equipo-nombre">🇿🇦 PATÓGENO</div>
         </div>
+
       </div>
     </div>
 
@@ -332,6 +354,11 @@ function forzarRango(rango) {
 
 function toggleDemo() {
   socket.emit('op_toggle_demo');
+}
+
+function ajustarMarcador(equipo, delta) {
+  socket.emit('op_ajustar_marcador', { equipo, delta });
+  log(`→ Marcador ${equipo} ${delta > 0 ? '+1' : '-1'}`, 'nuevo');
 }
 
 function actualizarBarrasOp(porcentajes) {

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Doble Protección: El Partido</title>
 <script src="/socket.io/socket.io.js"></script>
+<script src="https://player.vimeo.com/api/player.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700&family=Lexend:wght@300;400;600;700;900&display=swap');
 
@@ -1047,12 +1048,7 @@ html, body {
   </div>
   <!-- Player Vimeo (para producción/deploy) -->
   <div id="vimeo-container" style="display:none;width:100%;height:100%;position:relative;">
-    <iframe id="vimeo-player"
-      src=""
-      style="width:100%;height:100%;border:0;"
-      allow="autoplay; fullscreen"
-      allowfullscreen>
-    </iframe>
+    <div id="vimeo-player-target" style="width:100%;height:100%;"></div>
   </div>
   <!-- Player local (para demo con archivos locales) -->
   <video id="video-player" autoplay playsinline></video>
@@ -1083,6 +1079,16 @@ html, body {
   <div class="marc-divider"></div>
   <div id="marc-narrador" class="marc-narrador"></div>
   <div id="marc-mc" class="marc-mc"></div>
+</div>
+
+<!-- ══ AUDIO UNLOCK — aparece solo al inicio ══ -->
+<div id="audio-unlock" style="
+  position:fixed;inset:0;z-index:900;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;
+  background:rgba(4,10,22,0.97);cursor:pointer;" onclick="unlockAudio()">
+  <div style="font-size:5rem;">🔊</div>
+  <div style="font-size:2rem;font-weight:900;font-family:'Barlow Condensed',sans-serif;color:#fff;letter-spacing:0.05em;">TOCA PARA ACTIVAR AUDIO</div>
+  <div style="font-size:1rem;color:rgba(255,255,255,0.4);font-family:'Lexend',sans-serif;">Pantalla de Display — Doble Protección</div>
 </div>
 
 <!-- ══ STATS OVERLAY (slide desde derecha sobre RESULTADOS) ══ -->
@@ -1294,39 +1300,89 @@ function renderResultados(data) {
   }
 }
 
+// ── VIMEO PLAYER INSTANCE ──
+let _vimeoPlayer = null;
+
 function renderVideo(data) {
   const { videoArchivo, descripcionVideo, marcador } = data;
   document.getElementById('vp-desc').textContent = descripcionVideo || 'Reproduciendo jugada...';
 
-  const player      = document.getElementById('video-player');
-  const placeholder = document.getElementById('video-placeholder-bc');
+  const localPlayer    = document.getElementById('video-player');
+  const placeholder    = document.getElementById('video-placeholder-bc');
   const vimeoContainer = document.getElementById('vimeo-container');
-  const vimeoPlayer    = document.getElementById('vimeo-player');
 
-  // Ocultar todo primero
-  player.style.display = 'none';
+  // Detener Vimeo anterior si existe
+  if (_vimeoPlayer) {
+    _vimeoPlayer.destroy().catch(() => {});
+    _vimeoPlayer = null;
+  }
+
+  // Ocultar todo
+  localPlayer.style.display    = 'none';
   vimeoContainer.style.display = 'none';
-  placeholder.style.display = 'none';
+  placeholder.style.display    = 'none';
 
   if (!videoArchivo) {
     placeholder.style.display = 'flex';
+
   } else if (/^\d+$/.test(String(videoArchivo))) {
-    // Es un ID de Vimeo (solo números)
-    vimeoPlayer.src = `https://player.vimeo.com/video/${videoArchivo}?autoplay=1&controls=0&loop=0&title=0&byline=0&portrait=0&background=1`;
+    // ── VIMEO: usar Player API para autoplay con sonido
     vimeoContainer.style.display = 'block';
+    // Limpiar target anterior
+    const target = document.getElementById('vimeo-player-target');
+    target.innerHTML = '';
+
+    _vimeoPlayer = new Vimeo.Player(target, {
+      id:       parseInt(videoArchivo),
+      autoplay: true,
+      muted:    false,
+      controls: false,
+      loop:     false,
+      width:    window.innerWidth,
+      height:   window.innerHeight,
+    });
+
+    // Forzar play con sonido (por si el browser bloqueó)
+    _vimeoPlayer.ready().then(() => {
+      _vimeoPlayer.setVolume(1);
+      _vimeoPlayer.play().catch(() => {});
+    });
+
+    // Cuando termina el video
+    _vimeoPlayer.on('ended', () => {
+      if (data.marcador &&
+          data.marcador.MEX > parseInt(document.getElementById('vscore-mex').textContent)) {
+        animarGol(data.marcador);
+      }
+    });
+
+    // Estilo fullscreen del iframe que crea la API
+    _vimeoPlayer.ready().then(() => {
+      const iframe = vimeoContainer.querySelector('iframe');
+      if (iframe) {
+        iframe.style.cssText = 'width:100vw;height:100vh;border:0;position:absolute;top:0;left:0;';
+      }
+    });
+
   } else {
-    // Es archivo .mp4 local
-    player.src = `/videos/${videoArchivo}`;
-    player.style.display = 'block';
-    player.play().catch(() => {});
-    player.onended = () => {
-      if (data.marcador && data.marcador.MEX > parseInt(document.getElementById('vscore-mex').textContent)) {
+    // ── MP4 LOCAL
+    localPlayer.src = `/videos/${videoArchivo}`;
+    localPlayer.style.display = 'block';
+    localPlayer.play().catch(() => {});
+    localPlayer.onended = () => {
+      if (data.marcador &&
+          data.marcador.MEX > parseInt(document.getElementById('vscore-mex').textContent)) {
         animarGol(data.marcador);
       }
     };
   }
 
   if (marcador) actualizarScoreBug(marcador);
+}
+
+// ── DESBLOQUEO DE AUDIO ──
+function unlockAudio() {
+  document.getElementById('audio-unlock').style.display = 'none';
 }
 
 function renderMarcador(data) {
@@ -1499,6 +1555,13 @@ function _agregarLogroCorner(logro) {
   // Animar entrada con doble rAF para garantizar el reflow
   requestAnimationFrame(() => requestAnimationFrame(() => div.classList.add('llegó')));
 }
+
+// ── MARCADOR ACTUALIZADO MANUAL ──
+socket.on('marcador_actualizado', ({ marcador }) => {
+  actualizarScoreBug(marcador);
+  document.getElementById('marc-score-mex').textContent = marcador.MEX;
+  document.getElementById('marc-score-sa').textContent  = marcador.SA;
+});
 
 // ── VOTOS EN VIVO ──
 socket.on('votos_actualizados', ({ porcentajes }) => actualizarBarras(porcentajes));
