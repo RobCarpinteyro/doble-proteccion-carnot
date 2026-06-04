@@ -1203,7 +1203,7 @@ html, body {
 </div>
 
 <script>
-const socket = io();
+const socket = io({ transports: ['polling', 'websocket'] });
 let timerMax = 30;
 let jugadaActual = null;
 

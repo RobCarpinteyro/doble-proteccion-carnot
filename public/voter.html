@@ -348,7 +348,7 @@ const STORAGE_KEY = 'norma_mundial_session';
 let sessionToken = null;
 try { sessionToken = localStorage.getItem(STORAGE_KEY); } catch(e) {}
 
-const socket = io({ auth: { token: sessionToken } });
+const socket = io({ transports: ['polling', 'websocket'], auth: { token: sessionToken } });
 let timerMax = 30;
 let yaVote   = false;
 let fase     = 'LOBBY';
