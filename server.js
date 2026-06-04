@@ -19,8 +19,11 @@ const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, {
   cors: { origin: '*', methods: ['GET','POST'] },
-  transports: ['polling', 'websocket'],   // polling primero — funciona en Railway
+  transports: ['polling', 'websocket'],
   allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 10000,
 });
 
 const PORT = process.env.PORT || 3000;
@@ -67,6 +70,9 @@ let estado = {
 // ─── HELPERS ─────────────────────────────────────────────────────────
 
 function getLocalIP() {
+  // En Railway/cloud usar la variable de entorno, si no la IP local
+  if (process.env.RAILWAY_STATIC_URL) return process.env.RAILWAY_STATIC_URL;
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) return process.env.RAILWAY_PUBLIC_DOMAIN;
   const interfaces = os.networkInterfaces();
   for (const iface of Object.values(interfaces)) {
     for (const cfg of iface) {
